@@ -1,0 +1,5 @@
+backups/
+
+# i3-xfce-fedora is its own git repository, ready to push to GitHub on its own.
+# It is populated from this machine by i3-xfce-fedora/capture.sh.
+/i3-xfce-fedora/

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# ai-hub -- open the AI Hub launcher in the default browser, as an app window.
+#
+# Two things happen here, and both exist for a reason:
+#
+# 1. A tiny server on 127.0.0.1 (bin/ai-hub-server.py). It is needed twice over:
+#    the page loads data/ai.json with fetch(), which browsers refuse on a
+#    file:// page; and it exposes /open?id=<id>, which is how clicking a card
+#    gets the assistant its OWN window instead of a tab. The server is started
+#    only if the port is not already answering, so running this twice is safe.
+#
+# 2. --app mode. It drops the tab strip and address bar, so the launcher looks
+#    and behaves like an application window rather than a browser tab, and i3
+#    can then place it on the AI workspace.
+#
+# Usage: ai-hub [--port N] [--no-browser]
+
+set -euo pipefail
+
+PORT="${AI_HUB_PORT:-8765}"
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+OPEN_BROWSER=1
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --port) PORT="$2"; shift 2 ;;
+    --no-browser) OPEN_BROWSER=0; shift ;;
+    *) echo "ai-hub: unknown option $1" >&2; exit 2 ;;
+  esac
+done
+
+URL="http://127.0.0.1:$PORT/"
+
+# --- is something already serving? -------------------------------------------
+# bash's /dev/tcp rather than ss/netstat/lsof, none of which are guaranteed to
+# be installed.
+port_open() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
+
+if ! port_open; then
+  command -v python3 >/dev/null || { echo "ai-hub: needs python3 to serve the page" >&2; exit 1; }
+  # --bind 127.0.0.1 keeps it off the network; this is a personal launcher, not
+  # a web server.
+  setsid python3 "$ROOT/bin/ai-hub-server.py" "$PORT" >/dev/null 2>&1 < /dev/null &
+  for _ in $(seq 20); do port_open && break; sleep 0.1; done
+  port_open || { echo "ai-hub: server did not come up on $PORT" >&2; exit 1; }
+fi
+
+[ "$OPEN_BROWSER" = 1 ] || { echo "$URL"; exit 0; }
+
+# --- open it ------------------------------------------------------------------
+# bin/ai-open is the single place that knows how to start the default browser
+# in application mode; the server uses it too, for the assistant windows.
+exec "$ROOT/bin/ai-open" "$URL"

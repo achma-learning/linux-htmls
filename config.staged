@@ -1,0 +1,457 @@
+# ~/.config/i3/config — i3 4.25.1 (verified with `i3 --version`)
+#
+# ROUTE B: this machine logs into the standalone i3 session (/usr/share/xsessions/i3.desktop).
+# The XFCE pieces we want are started BY i3, as i3's own clients (see "XFCE COMPONENTS").
+# We never touch xfconf or xfce4-session; the XFCE session entry stays pristine as rollback.
+#
+# Every non-obvious directive cites the section of docs/userguide.txt that justifies it.
+# Syntax authority: `i3 -C -c <file>` against this binary, then docs/userguide.txt.
+
+set $mod Mod4
+
+# ─── COLOURS ──────────────────────────────────────────────────────────────────
+# Neutral greys, macOS-adjacent: the focused window is marked by a slightly
+# lighter hairline, not by a saturated colour.
+set $c-focus     #8a8a8a
+set $c-inactive  #3a3a3a
+set $c-unfocus   #2a2a2a
+set $c-urgent    #c05c5c
+set $c-text      #eeeeee
+set $c-text-dim  #8a8a8a
+set $c-indicator #6a9fb5
+
+# see userguide: "Changing colors"
+# order is: border  background  text  indicator  child_border
+client.focused          $c-focus     $c-focus    $c-text     $c-indicator $c-focus
+client.focused_inactive $c-inactive  $c-inactive $c-text-dim $c-inactive  $c-inactive
+client.unfocused        $c-unfocus   $c-unfocus  $c-text-dim $c-unfocus   $c-unfocus
+client.urgent           $c-urgent    $c-urgent   $c-text     $c-urgent    $c-urgent
+
+# Where this setup lives. Every script, theme and helper the config calls sits
+# under this one directory, so a fresh machine only has to change this line —
+# see the i3-xfce-fedora installer, which rewrites exactly this and nothing else.
+set $repo ~/i3-setup
+
+# ─── WORKSPACES ───────────────────────────────────────────────────────────────
+# Named via variables so renaming a workspace is a one-line change here.
+# Keep the leading number: i3 orders workspaces numerically only when the name
+# starts with a digit — see userguide: "Changing (named) workspaces".
+set $ws1  "1"
+set $ws2  "2"
+set $ws3  "3"
+set $ws4  "4"
+set $ws5  "5"
+set $ws6  "6"
+set $ws7  "7"
+set $ws8  "8"
+set $ws9  "9"
+set $ws10 "10"
+
+# ─── APPEARANCE ───────────────────────────────────────────────────────────────
+# Noto Sans is actually installed on this box (checked with fc-list). NOT DejaVu
+# Sans: only DejaVu Sans *Mono* is present here, so "DejaVu Sans" would silently
+# fall back to something else. The font is still used for tabbed/stacked titles.
+font pango:JetBrains Mono 12
+
+# 1px hairline instead of a titlebar. `pixel 1` keeps the resize/indicator edge
+# while removing the title text — see userguide: "Default border style".
+default_border pixel 1
+
+# Floating windows get NO border at all: they already read as separate objects
+# via picom's shadow and rounded corners, so a border would just be a hard edge
+# cutting across the rounding.
+default_floating_border pixel 0
+
+# Gaps. Native since i3 4.22 (userguide 4.34 "Gaps") — i3-gaps was merged into
+# i3 and is NOT a separate package. Inner gaps only: the outer edge is left
+# flush so windows sit tight against the panel.
+gaps inner 5
+
+# No gaps when a workspace holds exactly one window — a lone window sits
+# full-bleed instead of floating in a frame of empty space.
+smart_gaps on
+
+# Hide borders that touch a screen edge, so a single window looks borderless.
+# NOTE: `smart_borders` is the OLD spelling and is superseded — the userguide
+# says hide_edge_borders replaced it. See userguide: "Hiding borders adjacent
+# to the screen edges".
+hide_edge_borders both
+
+# Focus follows the keyboard only. Prevents the pointer sitting over the panel
+# or a dock icon from stealing focus as windows move under it.
+focus_follows_mouse no
+
+# Drag floating windows with $mod + left mouse.
+floating_modifier $mod
+
+# Drag TILING windows with $mod + mouse. Deliberately NOT `modifier titlebar`
+# (the wizard's default): `default_border pixel 1` removes titlebars, so the
+# titlebar half of that setting would refer to something that no longer exists.
+# see userguide: "Tiling drag"
+tiling_drag modifier
+
+# ─── NO BAR ───────────────────────────────────────────────────────────────────
+# There is deliberately NO `bar { }` block. xfce4-panel is the bar — both panels:
+# panel-1 (systray, clock, pager, tasklist) and panel-2 (the autohiding dock).
+# The panel reserves its own space via the EWMH _NET_WM_STRUT_PARTIAL property,
+# which i3 honours automatically, so tiled windows will not slide under it.
+# Removing this block also retires i3status and the $refresh_i3status variable.
+
+# ─── COMPOSITOR ───────────────────────────────────────────────────────────────
+# Compositor: shadows/fade/blur/rounded corners, and vsync to stop tearing.
+# Nothing else provides compositing here — xfwm4's compositor never runs,
+# because xfwm4 never runs. exec_always so it comes back after an i3 restart.
+# Config lives in this repo; validate it with:
+#   picom --config $repo/picom.conf --diagnostics
+# CAVEAT: that validator catches bad VALUES and syntax errors, but silently
+# ignores unknown option NAMES — a typo'd key is accepted and does nothing.
+#
+# THIS LINE MUST COME BEFORE xfce4-panel. i3 runs exec lines in file order, and
+# every out-of-process panel plugin picks its X visual once, at startup: with no
+# compositor owning _NET_WM_CM_S0 at that moment it gets an opaque one and paints
+# a dark rectangle behind its icons for the rest of the session. Ordering alone
+# is not enough either — "started" is not "ready" — so the panel is launched
+# through scripts/start-panel.sh, which waits for the selection.
+exec_always --no-startup-id picom --config $repo/picom.conf
+
+# ─── XFCE COMPONENTS (Route B) ────────────────────────────────────────────────
+# Verified against /etc/xdg/autostart: every one of these .desktop files is
+# OnlyShowIn=XFCE, so dex-autostart --environment i3 does NOT start them and
+# these lines duplicate nothing. xfce4-panel has no autostart file at all — it
+# is normally a session client, which is exactly why it must be exec'd here.
+# CHOICE: `exec`, not `exec_always`. `exec` runs once, at i3 startup.
+# `exec_always` also re-runs on RESTART ($mod+Shift+r) — see userguide 4.19 —
+# which would fire a second copy of all five on every restart. Their
+# single-instance behaviour varies (xfce4-panel and xfsettingsd refuse and exit;
+# thunar --daemon and the polkit agent are less predictable), and "mostly
+# harmless" is not a design. With `exec`, a restart re-reads this config and
+# keeps the ALREADY-RUNNING components attached — nothing is started twice and
+# nothing is killed.
+exec --no-startup-id xfsettingsd
+exec --no-startup-id $repo/scripts/start-panel.sh
+exec --no-startup-id xfce4-power-manager
+exec --no-startup-id thunar --daemon
+
+# Polkit authentication agent. Without one, any GUI action needing root auth
+# (mounting a system disk in Thunar, dnfdragora) fails with no password prompt.
+# Its .desktop is also OnlyShowIn=XFCE, so dex will not start it either.
+exec --no-startup-id /usr/libexec/xfce-polkit
+
+# ─── AUTOSTART ────────────────────────────────────────────────────────────────
+# dex runs the XDG autostart entries that DO apply to environment i3 — that is
+# what currently starts nm-applet, blueman, abrt-applet, seapplet, dnfdragora.
+exec --no-startup-id dex-autostart --autostart --environment i3
+
+# The wizard's explicit `exec nm-applet` line is REMOVED: nm-applet.desktop is
+# NotShowIn=KDE;GNOME, so dex already starts it under i3. Keeping both asked for
+# it twice.
+
+# Lock before suspend. xss-lock takes a logind sleep-inhibit lock so i3lock is
+# on screen before the machine actually suspends, not after it wakes.
+exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock --nofork
+
+# ─── SESSION AUTOSTART ────────────────────────────────────────────────────────
+# The apps that should already be open after login. `exec`, NOT exec_always, so
+# an i3 restart does not open a second copy of everything (userguide 4.19).
+# Which app goes where is decided by the `assign` rules further down, not by
+# this line — see $repo/scripts/autostart.sh, which is where the list of
+# apps lives.
+exec --no-startup-id $repo/scripts/autostart.sh
+
+# ─── LAUNCHING ────────────────────────────────────────────────────────────────
+bindsym $mod+Return exec --no-startup-id xfce4-terminal
+bindsym $mod+Shift+Return exec --no-startup-id thunar
+# AI Hub: the launcher page for every chatbot, on workspace 4. Serves itself
+# from 127.0.0.1 and opens in an --app window; see $repo/ai-hub/.
+bindsym $mod+Shift+a exec --no-startup-id $repo/ai-hub/bin/ai-hub
+# Straight into one chatbot, skipping the hub. Takes claude|chatgpt|deepseek.
+# NOTE $mod+Shift+c is already `reload` in this config, hence plain $mod+c.
+bindsym $mod+c exec --no-startup-id $repo/scripts/aichat.sh claude
+
+# rofi replaces dmenu. `drun` lists .desktop applications; `window` is a window
+# switcher, which dmenu has no equivalent for. Theming is via a .rasi theme file,
+# never the removed -bg/-fg CLI flags. rofi here is 2.0.0 — the theme was written
+# against the installed rofi-theme(5), not 1.7-era examples.
+# -theme takes a path or an installed theme name (rofi(1):492). The theme lives
+# in this repo so it is version-controlled with the config it matches, and so
+# nothing is written outside ~/i3-setup and ~/.config/i3.
+bindsym $mod+d exec --no-startup-id rofi -show drun -theme $repo/rofi/macos-adjacent.rasi
+# Spotlight-style: $mod+space is the launcher. This displaced `focus
+# mode_toggle`, which moved to $mod+t.
+bindsym $mod+space exec --no-startup-id rofi -show drun -theme $repo/rofi/macos-adjacent.rasi
+bindsym $mod+Tab exec --no-startup-id rofi -show window -theme $repo/rofi/macos-adjacent.rasi
+
+# ─── WINDOW MANAGEMENT ────────────────────────────────────────────────────────
+bindsym $mod+Shift+q kill
+
+# Focus, vim directions. NOTE this differs from the wizard config, which used
+# j/k/l/semicolon (shifted one key right). h=left j=down k=up l=right.
+bindsym $mod+h focus left
+bindsym $mod+j focus down
+bindsym $mod+k focus up
+bindsym $mod+l focus right
+
+# Arrow duplicates, for while the vim keys are still unlearned.
+bindsym $mod+Left  focus left
+bindsym $mod+Down  focus down
+bindsym $mod+Up    focus up
+bindsym $mod+Right focus right
+
+# Move the focused window.
+bindsym $mod+Shift+h move left
+bindsym $mod+Shift+j move down
+bindsym $mod+Shift+k move up
+bindsym $mod+Shift+l move right
+
+bindsym $mod+Shift+Left  move left
+bindsym $mod+Shift+Down  move down
+bindsym $mod+Shift+Up    move up
+bindsym $mod+Shift+Right move right
+
+# Split direction for the NEXT window opened in this container.
+# $mod+h is now focus-left, so horizontal split moves to $mod+b.
+bindsym $mod+b split h
+bindsym $mod+v split v
+
+bindsym $mod+f fullscreen toggle
+
+# Layouts: stacking = titles in a vertical list, tabbed = titles in a row.
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+
+bindsym $mod+Shift+space floating toggle
+
+# Move focus between the tiling and floating layers. Moved off $mod+space,
+# which is now the launcher (below).
+bindsym $mod+t focus mode_toggle
+
+# Focus the parent container — how you select a whole split to act on it.
+bindsym $mod+a focus parent
+
+# ─── MINIMIZE (scratchpad) ────────────────────────────────────────────────────
+# i3 has no "minimize". The scratchpad is the equivalent — see userguide 6.21
+# "Scratchpad". `move scratchpad` sends the focused window to a hidden
+# workspace; the userguide is explicit that "there is no way to open that
+# workspace", so the ONLY way back is `scratchpad show`.
+# `scratchpad show` brings it back as a FLOATING window centred on the current
+# workspace, and pressing it again on a visible scratchpad window hides it
+# again — so $mod+Shift+m is a toggle once the window is up.
+# With several windows in the scratchpad, repeated `scratchpad show` cycles
+# through them.
+# The two bindings go through scripts rather than calling i3 directly: the
+# script tags the window with an X property (_I3_MINIMIZED) that picom matches,
+# which is the only way to give minimizing its own animation. picom cannot
+# otherwise tell a minimize from a workspace switch — both reach it as the same
+# `hide` trigger. See $repo/scripts/minimize.sh and picom.conf.
+bindsym $mod+m exec --no-startup-id $repo/scripts/minimize.sh
+bindsym $mod+Shift+m exec --no-startup-id $repo/scripts/unminimize.sh
+
+# ─── WORKSPACES ───────────────────────────────────────────────────────────────
+# `workspace number` matches on the leading digit, so these still work if a
+# workspace is renamed to "1: mail" later.
+bindsym $mod+1 workspace number $ws1
+bindsym $mod+2 workspace number $ws2
+bindsym $mod+3 workspace number $ws3
+bindsym $mod+4 workspace number $ws4
+bindsym $mod+5 workspace number $ws5
+bindsym $mod+6 workspace number $ws6
+bindsym $mod+7 workspace number $ws7
+bindsym $mod+8 workspace number $ws8
+bindsym $mod+9 workspace number $ws9
+bindsym $mod+0 workspace number $ws10
+
+bindsym $mod+Shift+1 move container to workspace number $ws1
+bindsym $mod+Shift+2 move container to workspace number $ws2
+bindsym $mod+Shift+3 move container to workspace number $ws3
+bindsym $mod+Shift+4 move container to workspace number $ws4
+bindsym $mod+Shift+5 move container to workspace number $ws5
+bindsym $mod+Shift+6 move container to workspace number $ws6
+bindsym $mod+Shift+7 move container to workspace number $ws7
+bindsym $mod+Shift+8 move container to workspace number $ws8
+bindsym $mod+Shift+9 move container to workspace number $ws9
+bindsym $mod+Shift+0 move container to workspace number $ws10
+
+# ─── LAPTOP KEYS ──────────────────────────────────────────────────────────────
+# Audio via wpctl (WirePlumber), verified present: this box runs PipeWire 1.6.8.
+# @DEFAULT_AUDIO_SINK@ is resolved at press time — no hardcoded sink index.
+# -l 1.0 caps volume at 100% so a repeated keypress cannot boost past unity.
+bindsym XF86AudioRaiseVolume exec --no-startup-id wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
+bindsym XF86AudioLowerVolume exec --no-startup-id wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+bindsym XF86AudioMute        exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+bindsym XF86AudioMicMute     exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+
+# Brightness via brightnessctl, which writes through logind — NOT xbacklight,
+# whose RandR backlight property does not exist on this Broadwell/i915 panel.
+bindsym XF86MonBrightnessUp   exec --no-startup-id brightnessctl set 5%+
+bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 5%-
+
+# Media keys via playerctl (MPRIS).
+bindsym XF86AudioPlay exec --no-startup-id playerctl play-pause
+bindsym XF86AudioNext exec --no-startup-id playerctl next
+bindsym XF86AudioPrev exec --no-startup-id playerctl previous
+
+# Screenshot: XFCE's own tool, so it matches the rest of the desktop.
+bindsym Print exec --no-startup-id xfce4-screenshooter
+bindsym $mod+Print exec --no-startup-id xfce4-screenshooter --region
+
+# Lock now. loginctl asks logind, which triggers the xss-lock above — so the
+# lock path is the same one suspend uses, rather than a second parallel one.
+bindsym $mod+Escape exec --no-startup-id loginctl lock-session
+
+# ─── FLOATING RULES ───────────────────────────────────────────────────────────
+# Window types first: this catches XFCE's (and everyone else's) transient
+# dialogs generically, without naming each app.
+# see userguide: "Command criteria" — window_type compares _NET_WM_WINDOW_TYPE.
+for_window [window_type="dialog"]  floating enable
+for_window [window_type="utility"] floating enable
+for_window [window_type="splash"]  floating enable
+for_window [window_type="menu"]    floating enable
+
+# class = the SECOND part of WM_CLASS, instance = the first.
+# Verified from live windows with xprop where possible; see CHEATSHEET.md for
+# how to check any app yourself.
+for_window [class="Pavucontrol"]   floating enable
+for_window [class="Blueman-manager"] floating enable
+
+# ─── WORKSPACE ASSIGNMENTS ────────────────────────────────────────────────────
+# `assign` fires once, when the application MAPS its window, and the FIRST
+# matching assignment wins — later ones are not considered (userguide 4.18).
+# So the specific AI-chat rule MUST come before the general browser rule, or the
+# browser rule would swallow it. Criteria are regexes matched as substrings,
+# hence the ^...$ anchors.
+#
+# class = the SECOND field of WM_CLASS (instance is the first). Verified with
+# xprop on live windows / the installed .desktop files:
+#   thunar          -> "thunar", "Thunar"
+#   xfce4-terminal  -> "xfce4-terminal", "Xfce4-terminal"   ($mod+Return)
+#   kitty           -> "kitty", "kitty"
+#   brave-origin    -> "brave-origin", "Brave-origin"
+# Brave Origin is the default browser here — `xdg-settings get
+# default-web-browser` returns brave-origin.desktop. aichat.sh resolves the
+# default at run time rather than hardcoding it, so this keeps working if the
+# default changes; only the class below would need updating.
+#
+# The chatbot rule matches on INSTANCE, not class. Measured with xprop on the
+# real window: Brave Origin IGNORES --class in --app mode and always reports
+# class "Brave-origin"; what it does change is the instance, which it derives
+# from the app URL — `--app=https://claude.ai/new` gives
+#   WM_CLASS(STRING) = "claude.ai__new", "Brave-origin"
+# so the instance is the only field that tells a chatbot window apart from an
+# ordinary browser window. (aichat.sh still passes --class, which is what
+# Firefox honours, in case the default browser changes.)
+# A normal browser window opened at claude.ai has instance "brave-origin", so
+# this does not catch it — only the --app window from aichat.sh.
+# cliamp runs inside a terminal, so its window has the SAME WM_CLASS as any
+# other xfce4-terminal. What tells them apart is the role: autostart.sh passes
+# --role=cliamp, xfce4-terminal sets WM_WINDOW_ROLE from it (verified with
+# xprop), and this rule has to come before the generic terminal rule below.
+assign [window_role="^cliamp$"] → number $ws10
+# The AI Hub launcher. It is served from a local static server and opened with
+# --app, so Brave derives the instance from the host: WM_CLASS is
+# "127.0.0.1", "Brave-origin" (read off the live window). Class is useless here
+# — it is the same "Brave-origin" as every other Brave window — so match the
+# instance. This will also catch any OTHER --app window you ever serve from
+# 127.0.0.1; there is only the hub today.
+assign [instance="^127\\.0\\.0\\.1$"] → number $ws4
+# Workspace 4 stacks; every other workspace keeps i3's stock side-by-side split.
+#
+# i3 has no per-workspace layout setting — `workspace_layout` is global — so this
+# is done from the window instead: when the AI Hub appears, its container is
+# switched to stacking, and everything that lands on workspace 4 afterwards
+# joins that same container and stacks with it. The hub is opened at login by
+# scripts/autostart.sh and by $mod+Shift+a, so in practice it is always the
+# window that establishes the layout there.
+#
+# Consequence: on workspace 4 the assistants appear as a list of titles with one
+# visible, which is the point — they are alternatives to each other, not things
+# to look at side by side. $mod+e still toggles that container back to a split
+# if you want two of them at once.
+for_window [instance="^127\\.0\\.0\\.1$"] layout stacking
+assign [class="^AIChat$"]        → number $ws4
+# Ordinary browsing goes to 5; anything the browser opened as an APPLICATION
+# window goes to 4.
+#
+# The two are told apart by instance, not class — every Brave window has class
+# "Brave-origin". A normal window's instance is "brave-origin"; an --app window's
+# instance is derived from its URL ("claude.ai__new", "gemini.google.com",
+# "127.0.0.1"). So the specific rule below catches ordinary browsing and the
+# catch-all after it takes every app window.
+#
+# Written this way on purpose: listing the assistants' domains here would mean a
+# third place to edit whenever one is added to ai-hub/data/ai.json. Any other
+# Brave app window (a PWA, say) will also land on 4 — nothing else here uses one.
+assign [instance="^brave-origin$"] → number $ws5
+assign [class="^Brave-origin$"]  → number $ws4
+# NO assign rules for the terminal or the file manager, deliberately. Those two
+# should open WHERE YOU ARE, not always in the same place — an `assign` rule
+# applies forever, which is wrong for the two things you open constantly.
+# They are still put on workspaces 3 and 1 AT LOGIN, but by the login script
+# rather than by a permanent rule:
+#   * the session terminal is launched with --role=main-term and moved by the
+#     for_window rule below — only that one window carries the role;
+#   * the file manager is moved by scripts/autostart.sh once, after its window
+#     appears (Thunar has no usable marker: it ignores --class because its
+#     daemon is what actually creates the window).
+assign [class="^Anki$"]          → number $ws8
+# Obsidian, installed as an unpacked AppImage (scripts/obsidian-update.sh).
+# WM_CLASS read off the live window: "md.obsidian.obsidian", "md.obsidian.Obsidian".
+# The dots are regex metacharacters, hence the backslashes.
+assign [class="^md\.obsidian\.Obsidian$"] → number $ws6
+
+# Place and fullscreen the LOGIN terminal. Scoped to the one window
+# autostart.sh opens, NOT to the whole application class: a rule on
+# `class="^Xfce4-terminal$"` would send every terminal you ever open to
+# workspace 3 and fullscreen it, including the cliamp one. The session terminal
+# is marked with --role=main-term for exactly this reason; Anki needs no marker
+# because there is only ever one Anki window class.
+# for_window runs when the window appears, so `$mod+f` still toggles normally
+# afterwards.
+for_window [window_role="^main-term$"] move --no-auto-back-and-forth to workspace number $ws3
+for_window [window_role="^main-term$"] fullscreen enable
+for_window [class="^Anki$"] fullscreen enable
+
+# Anki: deliberately NOT floated. Its WM_CLASS is verified ("anki", "Anki") but
+# the main window is a full app you work in for hours, so it tiles like anything
+# else. The window_type rules above already float its dialogs.
+# If Anki's Browse window ever tiles badly, add a rule for it — CHEATSHEET.md
+# has the xprop recipe.
+
+# ─── MODES ────────────────────────────────────────────────────────────────────
+# NOTE: the mode name is normally drawn by i3bar, and we have no i3bar —
+# xfce4-panel cannot display i3's mode. So these names document the config but
+# will NOT appear on screen. See the Phase 2 notes for the nagbar alternative.
+mode "resize  [hjkl or arrows]  shift = 1px  •  enter/esc = done" {
+        bindsym h resize shrink width  10 px or 10 ppt
+        bindsym j resize grow   height 10 px or 10 ppt
+        bindsym k resize shrink height 10 px or 10 ppt
+        bindsym l resize grow   width  10 px or 10 ppt
+
+        bindsym Left  resize shrink width  10 px or 10 ppt
+        bindsym Down  resize grow   height 10 px or 10 ppt
+        bindsym Up    resize shrink height 10 px or 10 ppt
+        bindsym Right resize grow   width  10 px or 10 ppt
+
+        # Fine adjustment.
+        bindsym Shift+h resize shrink width  1 px or 1 ppt
+        bindsym Shift+j resize grow   height 1 px or 1 ppt
+        bindsym Shift+k resize shrink height 1 px or 1 ppt
+        bindsym Shift+l resize grow   width  1 px or 1 ppt
+
+        bindsym Return mode "default"
+        bindsym Escape mode "default"
+        bindsym $mod+r mode "default"
+}
+bindsym $mod+r mode "resize  [hjkl or arrows]  shift = 1px  •  enter/esc = done"
+
+# Power menu. NOT an i3 binding mode: a mode's name string is drawn by i3bar,
+# and there is no i3bar here, so an exit mode's on-screen help would be
+# invisible. rofi is visible and matches the launcher.
+# Path uses ~, the form the userguide itself uses (`exec_always ~/my_script.sh`,
+# userguide 4.19). Avoids any ambiguity about i3 substituting $-variables before
+# the shell sees them. No hardcoded /home/<user> path either way.
+bindsym $mod+Shift+e exec --no-startup-id $repo/scripts/powermenu.sh
+
+# Direct reload/restart, kept because they are muscle memory from the wizard config.
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart

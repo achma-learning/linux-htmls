@@ -1,0 +1,35 @@
+# AI Hub — the i3 side. Copy the bits you want into ~/.config/i3/config.
+#
+# The idea: workspace 4 is the AI workspace. The hub lives there, and so does
+# any chatbot you open from it.
+
+# 1. Open the hub. bin/ai-hub starts its own local server if needed, then opens
+#    the page as an --app window (no tab strip, no address bar).
+bindsym $mod+Shift+a exec --no-startup-id ~/i3-setup/ai-hub/bin/ai-hub
+
+# 2. Put the hub on the AI workspace.
+#
+#    Match on INSTANCE, not class. A Chromium-family browser in --app mode
+#    reports the SAME WM_CLASS as every other window of that browser
+#    ("Brave-origin" here) and derives the instance from the URL's host, so the
+#    hub window is:
+#        WM_CLASS(STRING) = "127.0.0.1", "Brave-origin"
+#    Check yours with:  xprop WM_CLASS   then click the hub window.
+assign [instance="^127\.0\.0\.1$"] → number 4
+
+#    And the assistants opened FROM the hub. They are app windows too, so their
+#    instance is their own host ("claude.ai__new", "gemini.google.com", …),
+#    while an ordinary browser window's instance is the browser's own name.
+#    Sending ordinary browsing somewhere else first and then catching everything
+#    left over means you never have to list the assistants' domains here — which
+#    would be a third place to edit every time you add one.
+assign [instance="^brave-origin$"] → number 5
+assign [class="^Brave-origin$"]    → number 4
+
+# 3. Optional: open the hub at login. Use `exec`, not `exec_always`, or an i3
+#    restart opens a second copy.
+# exec --no-startup-id ~/i3-setup/ai-hub/bin/ai-hub
+
+# 4. Optional: if you also open chatbots as --app windows, they get an instance
+#    derived from their own URL, so they can be assigned to the same workspace.
+# assign [instance="^(claude\.ai|chatgpt\.com|chat\.deepseek\.com)"] → number 4

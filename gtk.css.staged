@@ -1,0 +1,25 @@
+@import 'colors.css';
+
+/* ---- xfce4-panel ----------------------------------------------------------
+ * Deliberately almost empty. The panels' colour is set per panel in xfconf
+ * (/panels/panel-N/background-style = 1 plus background-rgba), which is the
+ * supported, stock way to do it: xfce4-panel then hands the same colour to
+ * every out-of-process plugin wrapper itself, so the bar stays one continuous
+ * surface with no CSS of ours to go stale on the next xfce4-panel update.
+ *
+ * Do NOT put a background-color or a border-radius on `.xfce4-panel.background`
+ * here. That selector matches the panel window AND every plugin's wrapper-2.0
+ * GtkPlug toplevel, and a plug is a real X window whose pixels replace the
+ * panel's: a radius turns every plugin into a pill, and `transparent` punches
+ * real holes through the bar (that was the blue sliver behind the Fedora menu
+ * icon and around the active window in the task list).
+ *
+ * The only thing below is hover polish, which touches nothing structural.
+ */
+.xfce4-panel.background button {
+    border-radius: 6px;   /* only ever drawn on hover, inside the item */
+}
+
+.xfce4-panel.background button:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}

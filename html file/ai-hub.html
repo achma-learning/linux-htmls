@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Hub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <header class="header">
+    <div class="brand">
+      <div class="logo">✦</div>
+      <div class="brand-name">AI Hub</div>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="search" class="search" type="text" placeholder="Search…" autocomplete="off" spellcheck="false">
+      <span class="shortcut">/</span>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="toolbar">
+      <div class="filters" id="filters"></div>
+      <div class="hint">
+        <kbd>←</kbd><kbd>↓</kbd><kbd>↑</kbd><kbd>→</kbd> move
+        <kbd>↵</kbd> open
+        <kbd>f</kbd> favourite
+        <kbd>/</kbd> search
+      </div>
+    </div>
+
+    <section class="grid" id="grid" aria-label="AI assistants"></section>
+  </main>
+
+  <footer class="footer">
+    <div class="status"><span class="dot"></span><span id="status">loading…</span></div>
+    <div id="count"></div>
+  </footer>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

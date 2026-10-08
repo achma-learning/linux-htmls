@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>deck</title>
+<style>
+/* ══════════ TOKENS ══════════
+   Colour is state, never decoration:
+   saffron = now/active · verdigris = done/lived
+   terracotta = prayer/rest · majorelle = external commitment */
+:root{
+  --ink:#11141B; --ink2:#171C25; --ink3:#1D2430; --ink4:#222B39;
+  --line:#28303D; --line2:#333D4D;
+  --tadelakt:#E9E5DB; --dim:#818C9E; --dimmer:#5A6473;
+  --saffron:#E8A33D; --verdigris:#4FB09A; --terracotta:#C96A4E; --majorelle:#5F7DF2;
+  --mono:"JetBrains Mono","IBM Plex Mono","Iosevka","Fira Code",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ar:"Noto Naskh Arabic","Amiri","Scheherazade New",serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;width:100%;overflow:hidden}
+body{
+  background:var(--ink);color:var(--tadelakt);
+  font-family:var(--mono);font-size:13px;line-height:1.35;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  -webkit-font-smoothing:antialiased;
+}
+:focus-visible{outline:1px solid var(--saffron);outline-offset:2px}
+.lbl{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--dimmer);font-weight:500}
+.ar{font-family:var(--ar);unicode-bidi:isolate;direction:rtl}
+
+/* ══════════ SHELL ══════════ */
+#deck{
+  height:100vh;width:100vw;display:grid;
+  grid-template-columns:154px 1fr minmax(300px,23vw);
+  grid-template-rows:32px 1fr 24px;
+  grid-template-areas:"bar bar bar" "spine main side" "keys keys keys";
+  gap:1px;background:var(--line);
+}
+.pane{background:var(--ink2);overflow:hidden;min-height:0;min-width:0}
+
+/* ── §BAR — GNOME three-zone. The centre zone is absolutely positioned so it
+      sits at the true optical centre no matter how wide the sides get. ── */
+#bar{grid-area:bar;background:var(--ink3);position:relative;display:flex;align-items:center;padding:0 12px}
+#bar-l,#bar-r{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--dim);z-index:1}
+#bar-r{margin-left:auto}
+#bar-c{
+  position:absolute;left:50%;top:0;bottom:0;transform:translateX(-50%);
+  display:flex;align-items:center;white-space:nowrap;
+}
+#bar-c span{padding:0 14px;position:relative}
+#bar-c span+span::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:11px;background:var(--line2)}
+#c-greg{color:var(--dim);font-size:12px}
+#c-clock{color:var(--tadelakt);font-size:13.5px;font-weight:600}
+#c-hij{color:var(--terracotta);font-size:12.5px}
+#b-city{color:var(--tadelakt);font-weight:500}
+#b-temp{color:var(--dim)}
+#b-wi{font-size:14px}
+#b-weeks{color:var(--saffron);font-weight:500}
+#b-weeks small{color:var(--dimmer);font-weight:400;letter-spacing:.1em;font-size:9px;text-transform:uppercase;margin-left:5px}
+.net{width:6px;height:6px;border-radius:50%;background:var(--verdigris);flex:none}
+/* agenda source. majorelle = external commitment (invariant 4): lit when the
+   week is live from Google, dim when it is the local JSON file. */
+.gdot{width:6px;height:6px;border-radius:50%;background:var(--majorelle);flex:none}
+.gdot.off{background:var(--line2)}
+.net.off{background:var(--terracotta)}.net.wait{background:var(--saffron)}
+
+/* ── §SPINE — the day, to scale ── */
+#spine{grid-area:spine;position:relative;padding:9px 0 8px;display:flex;flex-direction:column}
+#spine>.lbl{padding:0 11px 7px}
+#rail{position:relative;flex:1;margin:0 11px}
+#rail-track{position:absolute;left:47px;top:0;bottom:0;width:2px;background:var(--line2)}
+#rail-elapsed{position:absolute;left:47px;top:0;width:2px;background:linear-gradient(var(--verdigris),var(--saffron));opacity:.5}
+.notch{position:absolute;left:0;right:0;height:0;display:flex;align-items:center;transform:translateY(-50%)}
+.notch .t{width:43px;text-align:right;font-size:9.5px;color:var(--dimmer)}
+.notch .d{width:10px;height:1px;background:var(--line2)}
+/* the TRUE position of a prayer, drawn on the rail itself. The label row above
+   may be nudged to avoid a collision; this never moves, so a crowded evening
+   still reads its times off the rail correctly. */
+.tick{position:absolute;left:43px;width:10px;height:1px;background:var(--line2);transform:translateY(-50%)}
+.tick.pass{opacity:.45}
+.tick.next{background:var(--terracotta);height:2px}
+.notch .n{margin-left:6px;font-size:10px;color:var(--dim);white-space:nowrap}
+.notch.pass .n,.notch.pass .t{color:var(--dimmer)}
+.notch.next .d{background:var(--terracotta);height:2px}
+.notch.next .n{color:var(--terracotta);font-weight:600}
+.notch.next .t{color:var(--terracotta)}
+.blk{position:absolute;left:53px;width:9px;border-radius:1px;background:var(--verdigris);opacity:.85}
+.blk.brk{background:var(--terracotta);opacity:.38;width:5px}
+#nowmark{position:absolute;left:39px;right:0;height:0;transform:translateY(-50%);display:flex;align-items:center;pointer-events:none}
+#nowmark .dot{width:7px;height:7px;border-radius:50%;background:var(--saffron);margin-left:5px;animation:pulse 2.6s ease-out infinite}
+#nowmark .ln{position:absolute;left:12px;right:-5px;height:1px;background:var(--saffron);opacity:.3}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(232,163,61,.55)}70%{box-shadow:0 0 0 7px rgba(232,163,61,0)}100%{box-shadow:0 0 0 0 rgba(232,163,61,0)}}
+#spine-foot{padding:9px 11px 0;border-top:1px solid var(--line);margin-top:7px}
+#sf-name{font-size:11px;color:var(--dim);margin-top:4px}
+#sf-name .ar{color:var(--terracotta)}
+#sf-left{font-size:17px;font-weight:400;color:var(--terracotta);letter-spacing:-.01em;margin-top:2px;white-space:nowrap}
+
+/* ── §WEEK — the hero: yesterday → today+6 ── */
+#main{grid-area:main;display:flex;flex-direction:column;min-height:0}
+#weekhead{display:flex;justify-content:space-between;align-items:baseline;padding:9px 12px 0}
+#week{flex:1;display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--line);margin-top:8px;border-top:1px solid var(--line);min-height:0}
+.day{background:var(--ink2);display:flex;flex-direction:column;min-height:0;overflow:hidden;padding-bottom:5px}
+.day.past{background:#141922}
+.day.today{background:var(--ink3);box-shadow:inset 0 2px 0 var(--majorelle)}
+.dhead{padding:7px 7px 6px;text-align:center;border-bottom:1px solid var(--line);flex:none}
+.dhead .dw{font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dimmer)}
+.dhead .dn{font-size:19px;font-weight:300;letter-spacing:-.02em;color:var(--dim);margin-top:1px}
+.day.past .dhead .dw,.day.past .dhead .dn{color:#495264}
+.day.today .dhead .dw{color:var(--majorelle)}
+.day.today .dhead .dn{color:var(--tadelakt);font-weight:500}
+.dbody{flex:1;overflow:hidden;padding:5px 5px 0;display:flex;flex-direction:column;gap:3px;min-height:0}
+.chip{background:var(--ink4);border-left:2px solid var(--majorelle);border-radius:2px;padding:3px 5px;flex:none}
+.chip .ct{font-size:9.5px;color:var(--majorelle)}
+.chip .cn{font-size:10.5px;color:var(--tadelakt);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.chip.done{opacity:.4}
+.chip.now{border-left-color:var(--saffron);background:#26221B}
+.chip.now .ct{color:var(--saffron)}
+.chip.allday{border-left-color:var(--verdigris)}
+.chip.allday .ct{color:var(--verdigris)}
+.more{font-size:9px;color:var(--dimmer);text-align:center;padding-top:1px;flex:none}
+.dfree{font-size:9px;color:#3C4453;text-align:center;padding-top:10px;letter-spacing:.1em;flex:none}
+
+/* ── §FOCUS — demoted to a strip ── */
+#focus{
+  flex:none;height:104px;border-top:1px solid var(--line);background:var(--ink2);
+  display:flex;align-items:center;gap:22px;padding:0 16px;
+}
+#ftime{display:flex;flex-direction:column;align-items:flex-start;flex:none}
+#phase{font-size:9px;letter-spacing:.24em;text-transform:uppercase;color:var(--saffron)}
+#phase.brk{color:var(--terracotta)}
+#clockbig{font-size:44px;line-height:1.02;font-weight:200;letter-spacing:-.03em;color:var(--dim)}
+#clockbig.run{color:var(--saffron)}#clockbig.brk{color:var(--terracotta)}
+#dots{display:flex;gap:6px;flex:none}
+.dot4{width:8px;height:8px;border:1px solid var(--line2);border-radius:50%}
+.dot4.on{background:var(--verdigris);border-color:var(--verdigris)}
+.dot4.cur{border-color:var(--saffron);box-shadow:inset 0 0 0 2px var(--saffron)}
+#fmid{flex:1;min-width:0}
+#intent{font-size:14px;color:var(--tadelakt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
+#intent.empty{color:var(--dimmer);font-size:12px}
+#warn{font-size:10.5px;color:var(--terracotta);height:14px;margin-top:4px}
+#fquote{font-size:9.5px;color:var(--dimmer);margin-top:3px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fright{flex:none;text-align:right;width:132px}
+#fright b{display:block;font-size:20px;font-weight:400;color:var(--verdigris);letter-spacing:-.02em}
+#goalbar{height:3px;background:var(--line2);margin-top:6px;overflow:hidden}
+#goalbar i{display:block;height:100%;background:var(--verdigris);transition:width .5s linear}
+#goalbar i.met{background:var(--saffron)}
+
+/* ── §SIDE — life + weather ── */
+#side{grid-area:side;display:flex;flex-direction:column;min-height:0}
+/* life + age together occupy exactly the week grid's height; the hadith
+   sits beside the focus strip, so the two columns share a baseline. */
+#lifewrap{flex:1;display:flex;flex-direction:column;min-height:0}
+#sidefoot{flex:none;height:104px;border-top:1px solid var(--line);padding:8px 11px 0;overflow:hidden}
+#hadith-ar{font-family:var(--ar);direction:rtl;unicode-bidi:isolate;font-size:10px;line-height:1.6;color:var(--terracotta)}
+#hadith-en{font-size:8.5px;line-height:1.5;color:var(--dimmer);margin-top:6px}
+#hadith-en b{color:var(--dim);font-weight:500}
+#life{flex:1;padding:9px 11px;display:flex;flex-direction:column;min-height:0}
+#lifehead{display:flex;justify-content:space-between;align-items:baseline}
+#stage{font-size:9.5px;color:var(--saffron)}
+#lcwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;margin:7px 0 0}
+#lc{display:block}
+/* stage legend — the grid is ten colours; without this they mean nothing */
+#lgd{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px;padding:3px 0 7px;flex:none}
+#lgd span{display:flex;align-items:center;gap:5px;font-size:8px;color:var(--dimmer);letter-spacing:.02em}
+#lgd span.cur{color:var(--saffron);font-weight:600}
+#lgd i{width:7px;height:7px;border-radius:1px;flex:none;display:block}
+/* live age — one reading, ticking. After alphabt/mortality: a fractional
+   year reads in half a second where four unit-labelled fields need parsing. */
+#age{flex:none;border-top:1px solid var(--line);padding:9px 11px 0;margin-top:auto}
+#age-big{
+  font-size:29px;font-weight:300;letter-spacing:-.035em;color:var(--tadelakt);
+  margin-top:5px;white-space:nowrap;display:flex;align-items:baseline;
+}
+#age-frac{font-size:16px;font-weight:300;color:var(--saffron);letter-spacing:-.01em}
+#age-bar{height:2px;background:var(--line2);margin-top:9px;overflow:hidden}
+#age-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--verdigris),var(--saffron));transition:width .4s linear}
+#age-sub{font-size:9.5px;color:var(--dimmer);margin-top:6px;letter-spacing:.04em}
+
+/* ── §KEYS ── */
+#keys{grid-area:keys;background:var(--ink3);display:flex;align-items:center;gap:15px;padding:0 12px;font-size:10px;color:var(--dimmer);overflow:hidden}
+#keys kbd{background:var(--ink);border:1px solid var(--line2);border-radius:2px;padding:0 4px;color:var(--dim);font-family:var(--mono);font-size:9.5px;margin-right:4px}
+#motto{margin-left:auto;color:#4A5361;letter-spacing:.1em;font-style:italic;white-space:nowrap;flex:none}
+
+/* ── §ADHAN PILL — macOS drop-in, 3s ── */
+/* The pill is the ONLY blur in this file, and a hidden one still costs you a
+   compositing layer that carries a live backdrop-filter: Chromium keeps
+   painting that layer's blurred backdrop even at opacity 0 and translated off
+   the top of the viewport, which shows up as a faint blurred band along the
+   screen edge. So the pill is taken out of rendering entirely between adhans
+   (visibility:hidden) and the blur is attached only by .show. The
+   visibility transition is delayed by the fade duration so the pill is still
+   painted while it animates out, and instant on the way in. */
+#adhan{
+  position:fixed;top:0;left:50%;z-index:80;
+  transform:translate(-50%,-160%);opacity:0;visibility:hidden;pointer-events:none;
+  display:flex;align-items:center;gap:12px;
+  background:rgba(29,36,48,.94);
+  border:1px solid var(--line2);border-radius:999px;padding:10px 20px 10px 15px;
+  box-shadow:0 20px 55px rgba(0,0,0,.6),inset 0 1px 0 rgba(233,229,219,.07);
+  transition:transform .45s cubic-bezier(.2,1.25,.35,1),opacity .28s ease,visibility 0s linear .28s;
+}
+#adhan.show{
+  transform:translate(-50%,16px);opacity:1;visibility:visible;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  transition:transform .45s cubic-bezier(.2,1.25,.35,1),opacity .28s ease,visibility 0s;
+}
+#adhan .ic{font-size:21px;line-height:1}
+#adhan .ttl{font-size:13.5px;color:var(--terracotta);font-weight:600}
+#adhan .sub{font-size:10.5px;color:var(--dim);margin-top:2px;letter-spacing:.04em}
+#adhan .tm{font-size:19px;font-weight:300;margin-left:4px;padding-left:15px;border-left:1px solid var(--line2)}
+
+/* ── §OVERLAYS ── */
+.ov{position:fixed;inset:0;background:rgba(8,10,14,.86);display:none;align-items:flex-start;justify-content:center;padding-top:11vh;z-index:60}
+.ov.show{display:flex}
+.card{background:var(--ink2);border:1px solid var(--line2);border-radius:3px;width:min(620px,86vw);max-height:74vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.card h2{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--dimmer);font-weight:500;padding:13px 16px 0}
+.card .body{padding:12px 16px 16px}
+input{background:var(--ink);border:1px solid var(--line2);color:var(--tadelakt);font-family:var(--mono);font-size:13px;padding:7px 9px;border-radius:2px;width:100%}
+input:focus{outline:none;border-color:var(--saffron)}
+input.bad{border-color:var(--terracotta)}
+button{background:var(--ink3);border:1px solid var(--line2);color:var(--tadelakt);font-family:var(--mono);font-size:12px;padding:7px 12px;border-radius:2px;cursor:pointer}
+button:hover{border-color:var(--saffron)}
+#g-status{font-size:10.5px;color:var(--dimmer);margin-top:-4px;margin-bottom:12px}
+#g-status.on{color:var(--verdigris)}
+.sep{border-top:1px solid var(--line);margin:14px 0 12px;padding-top:12px}
+.sep .lbl{display:block;margin-bottom:10px}
+#pal-in{border:0;border-bottom:1px solid var(--line2);border-radius:0;font-size:16px;padding:14px 16px}
+#pal-list{max-height:44vh;overflow:auto}
+.pi{padding:8px 16px;display:flex;gap:10px;align-items:baseline;cursor:pointer;font-size:13px}
+.pi .k{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer);width:52px;flex:none}
+.pi .sub{color:var(--dimmer);font-size:11px;margin-left:auto}
+.pi.sel{background:var(--ink3);box-shadow:inset 2px 0 0 var(--saffron)}
+.frow{display:grid;grid-template-columns:158px 1fr;gap:10px;align-items:center;margin-bottom:10px}
+.frow label{font-size:11px;color:var(--dim)}
+.hint{font-size:10.5px;color:var(--dimmer);margin-top:12px;line-height:1.7}
+.hint code{color:var(--dim);background:var(--ink3);padding:1px 4px;border-radius:2px}
+#help table{width:100%;border-collapse:collapse;font-size:12px}
+#help td{padding:4px 0;border-bottom:1px solid var(--line)}
+#help td:first-child{width:126px;color:var(--saffron)}
+#help td:last-child{color:var(--dim)}
+#toast{position:fixed;bottom:34px;left:50%;transform:translateX(-50%);background:var(--ink3);border:1px solid var(--line2);padding:7px 14px;border-radius:2px;font-size:12px;opacity:0;transition:opacity .18s;pointer-events:none;z-index:70}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <div id="bar">
+    <div id="bar-l">
+      <span class="net wait" id="net" title="data source"></span>
+      <span class="gdot off" id="gdot" title="agenda: local JSON file"></span>
+      <span id="b-city">—</span><span id="b-temp">--°</span><span id="b-wi">·</span>
+    </div>
+    <div id="bar-c">
+      <span id="c-greg">—</span><span id="c-clock">--:--:--</span><span id="c-hij" class="ar">—</span>
+    </div>
+    <div id="bar-r"><span id="b-weeks">—<small>weeks left</small></span></div>
+  </div>
+
+  <div id="spine" class="pane">
+    <div class="lbl">Day spine</div>
+    <div id="rail">
+      <div id="rail-track"></div><div id="rail-elapsed"></div>
+      <div id="nowmark"><div class="ln"></div><div class="dot"></div></div>
+    </div>
+    <div id="spine-foot">
+      <div class="lbl">Next prayer</div>
+      <div id="sf-name">—</div>
+      <div id="sf-left">—</div>
+    </div>
+  </div>
+
+  <div id="main" class="pane">
+    <div id="weekhead"><div class="lbl">The week</div><div class="lbl" id="weekrange">—</div></div>
+    <div id="week"></div>
+    <div id="focus">
+      <div id="ftime"><div id="phase">focus</div><div id="clockbig">25:00</div></div>
+      <div id="dots"></div>
+      <div id="fmid">
+        <div id="intent" class="empty">press i to name this session</div>
+        <div id="warn"></div>
+        <div id="fquote">We are what we repeatedly do. Excellence, then, is not an act, but a habit. — Will Durant</div>
+      </div>
+      <div id="fright">
+        <b id="fr-count">0m</b>
+        <span class="lbl" id="fr-lbl">of 4h goal</span>
+        <div id="goalbar"><i style="width:0"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="side" class="pane">
+   <div id="lifewrap">
+    <div id="life">
+      <div id="lifehead"><div class="lbl">Life in weeks</div><div id="stage">—</div></div>
+      <div id="lcwrap"><canvas id="lc"></canvas></div>
+      <div id="lgd"></div>
+      <div id="age">
+        <div class="lbl">Years left</div>
+        <div id="age-big">—</div>
+        <div id="age-bar"><i style="width:0"></i></div>
+        <div id="age-sub">—</div>
+      </div>
+    </div>
+   </div>
+   <div id="sidefoot" title="Take advantage of five before five: your youth before your old age, your health before your illness, your wealth before your poverty, your free time before your busyness, and your life before your death. — Prophet Muhammad ﷺ">
+     <div id="hadith-ar">اغْتَنِمْ خَمْسًا قَبْلَ خَمْسٍ: شَبَابَكَ قَبْلَ هَرَمِكَ، وَصِحَّتَكَ قَبْلَ سَقَمِكَ، وَغِنَاكَ قَبْلَ فَقْرِكَ، وَفَرَاغَكَ قَبْلَ شُغُلِكَ، وَحَيَاتَكَ قَبْلَ مَوْتِكَ</div>
+     <div id="hadith-en">Youth before old age · health before illness · wealth before poverty · free time before busyness · life before death — <b>Prophet Muhammad ﷺ</b></div>
+   </div>
+  </div>
+
+  <div id="keys">
+    <span><kbd>space</kbd>start/pause</span><span><kbd>r</kbd>reset</span>
+    <span><kbd>n</kbd>next phase</span><span><kbd>i</kbd>intention</span>
+    <span><kbd>c</kbd>city</span><span><kbd>s</kbd>settings</span>
+    <span><kbd>R</kbd>refetch</span><span><kbd>:</kbd>command</span><span><kbd>?</kbd>keys</span>
+    <span id="motto">a tool to serve you, son of Adam</span>
+  </div>
+</div>
+
+<div class="ov" id="ov-pal"><div class="card" style="padding:0">
+  <input id="pal-in" placeholder="type a city, a command…" autocomplete="off" spellcheck="false">
+  <div id="pal-list"></div>
+</div></div>
+
+<div class="ov" id="ov-set"><div class="card">
+  <h2>Settings</h2>
+  <div class="body">
+    <div class="frow"><label>Birthday</label><input type="text" id="f-bday" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" autocomplete="off"></div>
+    <div class="frow"><label>Life expectancy</label><input type="number" id="f-exp" min="40" max="120"></div>
+    <div class="frow"><label>Focus minutes</label><input type="number" id="f-work" min="1" max="180"></div>
+    <div class="frow"><label>Short break</label><input type="number" id="f-short" min="1" max="60"></div>
+    <div class="frow"><label>Long break</label><input type="number" id="f-long" min="1" max="90"></div>
+    <div class="frow"><label>Sessions per cycle</label><input type="number" id="f-cyc" min="2" max="8"></div>
+    <div class="frow"><label>Daily focus goal (min)</label><input type="number" id="f-goal" min="30" max="900" step="30"></div>
+    <div class="sep">
+      <span class="lbl">Agenda</span>
+      <div class="frow"><label>Google OAuth client ID</label><input id="f-gid" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false"></div>
+      <div class="frow"><label></label><button id="g-btn" type="button">Connect Google Calendar</button></div>
+      <div id="g-status">Not connected — falling back to the JSON file.</div>
+      <div class="frow"><label>JSON fallback</label><input id="f-ics" placeholder="./data/events.json"></div>
+    </div>
+    <div class="hint">Saves as you type. <code>Esc</code> closes.<br>
+    Google needs a Cloud project with the Calendar API on, and this page's origin
+    (<code>http://localhost:8787</code>) listed as an authorised JavaScript origin.
+    Connecting loads Google's script — the only time the deck touches a remote origin
+    it didn't have to. The <code>gcal-sync</code> JSON path stays available and works offline.</div>
+  </div>
+</div></div>
+
+<div class="ov" id="ov-help"><div class="card" id="help">
+  <h2>Keys</h2>
+  <div class="body"><table>
+    <tr><td>space</td><td>start / pause the timer</td></tr>
+    <tr><td>r</td><td>reset the current phase</td></tr>
+    <tr><td>n</td><td>skip to the next phase</td></tr>
+    <tr><td>i</td><td>name this session</td></tr>
+    <tr><td>c &nbsp;:&nbsp; ctrl+k</td><td>command palette — cities and actions</td></tr>
+    <tr><td>s</td><td>settings</td></tr>
+    <tr><td>R</td><td>refetch prayer, weather and agenda</td></tr>
+    <tr><td>?</td><td>this list</td></tr>
+    <tr><td>esc</td><td>close anything open</td></tr>
+  </table>
+  <div class="hint">The deck never scrolls. If anything is clipped, the window is under 1280&times;720.</div></div>
+</div></div>
+
+<div id="adhan" role="status" aria-live="polite"></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   deck v0.2 — a read-only orientation console.
+   Ported from “Time Island & Sidebar Widgets” v5.0.1 (Achma, MIT).
+   Kept verbatim: CITIES, PRAYERS, toHijri(), LIFE_STAGES, calcAge().
+   Replaced: GM_* → localStorage · GM_xmlhttpRequest → fetch
+             wttr.in → Open-Meteo (CORS) · daily timings → cached month
+   Evicted in v0.2: the prayer grid — the spine renders it strictly better.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── §0 DATA ── */
+const CITIES=[
+ [1,'الرباط','Rabat','Rabat',34.02,-6.84],[7,'القنيطرة','Kénitra','Kenitra',34.26,-6.58],
+ [14,'طنجة','Tanger','Tangier',35.76,-5.83],[15,'تطوان','Tétouan','Tetouan',35.59,-5.36],
+ [18,'شفشاون','Chefchaouen','Chefchaouen',35.17,-5.26],[23,'الحسيمة','Al Hoceïma','Al Hoceima',35.25,-3.93],
+ [29,'وزان','Ouezzane','Ouazzane',34.80,-5.58],[31,'وجدة','Oujda','Oujda',34.68,-1.91],
+ [39,'الناظور','Nador','Nador',35.17,-2.93],[35,'كرسيف','Guercif','Guercif',34.23,-3.35],
+ [58,'الدار البيضاء','Casablanca','Casablanca',33.57,-7.59],[59,'المحمدية','Mohammedia','Mohammedia',33.69,-7.38],
+ [61,'سطات','Settat','Settat',33.00,-7.62],[65,'برشيد','Berrechid','Berrechid',33.27,-7.59],
+ [66,'الجديدة','El Jadida','El Jadida',33.23,-8.50],[73,'بني ملال','Béni Mellal','Beni Mellal',32.34,-6.35],
+ [79,'خريبكة','Khouribga','Khouribga',32.88,-6.91],[81,'فاس','Fès','Fez',34.02,-5.01],
+ [89,'تازة','Taza','Taza',34.21,-4.01],[99,'مكناس','Meknès','Meknes',33.89,-5.55],
+ [100,'يفرن','Ifrane','Ifrane',33.53,-5.11],[103,'آزرو','Azrou','Azrou',33.44,-5.22],
+ [104,'مراكش','Marrakech','Marrakech',31.63,-7.98],[106,'الصويرة','Essaouira','Essaouira',31.51,-9.77],
+ [108,'بنجرير','Benguerir','Benguerir',32.23,-7.95],[111,'آسفي','Safi','Safi',32.30,-9.24],
+ [117,'أكادير','Agadir','Agadir',30.43,-9.60],[118,'تارودانت','Taroudant','Taroudant',30.47,-8.88],
+ [119,'تزنيت','Tiznit','Tiznit',29.70,-9.80],[123,'طاطا','Tata','Tata',29.75,-7.97],
+ [128,'الرشيدية','Errachidia','Errachidia',31.93,-4.43],[136,'ميدلت','Midelt','Midelt',32.68,-4.73],
+ [137,'زاكورة','Zagora','Zagora',30.33,-5.84],[138,'ورزازات','Ouarzazate','Ouarzazate',30.92,-6.90],
+ [139,'تنغير','Tinghir','Tinghir',31.51,-5.53],[149,'كلميم','Guelmim','Guelmim',28.98,-10.06],
+ [152,'طانطان','Tan-Tan','Tan-Tan',28.44,-11.10],[156,'العيون','Laâyoune','Laayoune',27.13,-13.16],
+ [165,'الداخلة','Dakhla','Dakhla',23.68,-15.96],[148,'سيدي إفني','Sidi Ifni','Sidi Ifni',29.38,-10.17],
+];
+const PRAYERS=[
+ {key:'Fajr',ar:'الفجر',en:'Fajr'},{key:'Sunrise',ar:'الشروق',en:'Shuruq'},
+ {key:'Dhuhr',ar:'الظهر',en:'Dhuhr'},{key:'Asr',ar:'العصر',en:'Asr'},
+ {key:'Maghrib',ar:'المغرب',en:'Maghrib'},{key:'Isha',ar:'العشاء',en:'Isha'},
+];
+const HIJRI_M=['مُحَرَّم','صَفَر','رَبِيع الأَوَّل','رَبِيع الثَّانِي','جُمَادَى الأُولَى','جُمَادَى الثَّانِيَة','رَجَب','شَعْبَان','رَمَضَان','شَوَّال','ذُو القَعْدَة','ذُو الحِجَّة'];
+const EN_M=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const LIFE_STAGES=[
+ {min:0,label:'0–2 Suckling',color:'#FADADD'},{min:2,label:'2–7 Fitrah',color:'#F3E5AB'},
+ {min:7,label:'7–10 Tamyeez',color:'#A8C3A6'},{min:10,label:'10–14 Taklif',color:'#F39C12'},
+ {min:14,label:'14–18 Identity',color:'#FF6F61'},{min:18,label:'18–25 Forging',color:'#FFD700'},
+ {min:25,label:'25–40 Ascend',color:'#4A90E2'},{min:40,label:'40–60 Wisdom',color:'#B87333'},
+ {min:60,label:'60–70 Median',color:'#9B59B6'},{min:70,label:'70–80 Grace',color:'#BDC3C7'},
+];
+const WMO={0:['☀','Clear'],1:['🌤','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁','Overcast'],
+ 45:['🌫','Fog'],48:['🌫','Rime fog'],51:['🌦','Light drizzle'],53:['🌦','Drizzle'],55:['🌧','Dense drizzle'],
+ 61:['🌧','Light rain'],63:['🌧','Rain'],65:['🌧','Heavy rain'],66:['🧊','Freezing rain'],67:['🧊','Freezing rain'],
+ 71:['🌨','Light snow'],73:['❄','Snow'],75:['❄','Heavy snow'],77:['🌨','Snow grains'],
+ 80:['🌦','Showers'],81:['🌧','Showers'],82:['🌧','Violent showers'],85:['🌨','Snow showers'],86:['❄','Snow showers'],
+ 95:['⛈','Thunderstorm'],96:['⛈','Storm + hail'],99:['⛈','Storm + hail']};
+
+/* ── §1 HELPERS ── */
+const $=id=>document.getElementById(id);
+const P=n=>String(n).padStart(2,'0');
+const gGet=(k,d)=>{try{const v=localStorage.getItem('deck_'+k);return v===null?d:JSON.parse(v)}catch{return d}};
+const gSet=(k,v)=>{try{localStorage.setItem('deck_'+k,JSON.stringify(v))}catch{}};
+const tMin=s=>{if(!s)return -1;const p=String(s).trim().split(':');return +p[0]*60+ +p[1]};
+const norm=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const dayKey=d=>`${d.getFullYear()}-${P(d.getMonth()+1)}-${P(d.getDate())}`;
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);x.setHours(12,0,0,0);return x};
+function toHijri(gY,gM,gD){
+  const a=Math.floor((14-(gM+1))/12),y=gY+4800-a,m=(gM+1)+12*a-3;
+  let jd=gD+Math.floor((153*m+2)/5)+365*y+Math.floor(y/4)-Math.floor(y/100)+Math.floor(y/400)-32045;
+  let l=jd-1948440+10632;const n=Math.floor((l-1)/10631);l=l-10631*n+354;
+  const j=Math.floor((10985-l)/5316)*Math.floor((50*l)/17719)+Math.floor(l/5670)*Math.floor((43*l)/15238);
+  l=l-Math.floor((30-j)/15)*Math.floor((17719*j)/50)-Math.floor(j/16)*Math.floor((15238*j)/43)+29;
+  const hM=Math.floor((24*l)/709);return{year:30*n+j-30,month:hM,day:l-Math.floor((709*hM)/24)};
+}
+function lifeStage(a){for(let i=LIFE_STAGES.length-1;i>=0;i--)if(a>=LIFE_STAGES[i].min)return LIFE_STAGES[i];return LIFE_STAGES[0]}
+function calcAge(bs){
+  if(!bs)return null;const b=new Date(bs+'T00:00:00');if(isNaN(b))return null;
+  const now=new Date();if(now<b)return null;
+  let y=now.getFullYear()-b.getFullYear(),mo=now.getMonth()-b.getMonth(),d=now.getDate()-b.getDate();
+  if(d<0){mo--;d+=new Date(now.getFullYear(),now.getMonth(),0).getDate()}
+  if(mo<0){y--;mo+=12}
+  return{y,mo,d,h:now.getHours()-b.getHours()<0?24+now.getHours()-b.getHours():now.getHours()-b.getHours(),
+         hh:now.getHours(),mi:now.getMinutes(),se:now.getSeconds(),
+         totalDays:Math.floor((now-b)/86400000),ms:now-b};
+}
+let toastT;
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1800)}
+function net(s){const n=$('net');n.className='net'+(s==='off'?' off':s==='wait'?' wait':'');n.title=s==='off'?'offline — showing cache':s==='wait'?'fetching':'live'}
+/* <input type="date"> renders in the BROWSER's locale, which no attribute
+   overrides. A text field is the only way to guarantee dd/mm/yyyy. */
+const isoToDmy=iso=>{
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return '';
+  const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`;
+};
+function dmyToIso(v){
+  const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(v).trim());
+  if(!m)return null;
+  const d=+m[1],mo=+m[2],y=+m[3];
+  if(mo<1||mo>12||d<1||d>31||y<1900||y>2200)return null;
+  const dt=new Date(y,mo-1,d);
+  if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return null; /* 31/02 */
+  if(dt>new Date())return null;
+  return `${y}-${P(mo)}-${P(d)}`;
+}
+/* "3 h, 32 min" — but under an hour, just "32 min" */
+function fmtLeft(mins){
+  const h=Math.floor(mins/60),m=mins%60;
+  return h>0?`${h} h, ${m} min`:`${m} min`;
+}
+/* touch the DOM only when the value actually changed */
+function setTxt(el,v){if(el.textContent!==v)el.textContent=v}
+
+/* ── §2 STATE ── */
+const cfg={
+  city:gGet('city',22),bday:gGet('bday',''),expect:gGet('expect',80),
+  work:gGet('work',25),short:gGet('short',5),long:gGet('long',15),cycle:gGet('cycle',4),
+  icsPath:gGet('icsPath','./data/events.json'),
+  goal:gGet('goal',240),          /* 4h of real focus, every day */
+  gClientId:gGet('gClientId',''),
+};
+let prayer=null,apiHijri=null,weather=null,eventsByDay=null;
+const getCity=()=>CITIES[cfg.city]||CITIES[22];
+function todaySessions(){const a=gGet('sessions',{});return a[dayKey(new Date())]||[]}
+function pushSession(rec){
+  const all=gGet('sessions',{}),k=dayKey(new Date());
+  (all[k]=all[k]||[]).push(rec);
+  const keys=Object.keys(all).sort();while(keys.length>90)delete all[keys.shift()];
+  gSet('sessions',all);
+}
+
+/* ── §3 PRAYER — AlAdhan method=21, default output, no tune ── */
+async function loadPrayer(force){
+  const c=getCity(),now=new Date();
+  const key=`pray_${c[0]}_${now.getFullYear()}_${now.getMonth()+1}`;
+  const cached=gGet(key,null);
+  if(cached){applyPrayer(cached,now);net('ok');if(!force)return}
+  net('wait');
+  const url=`https://api.aladhan.com/v1/calendar/${now.getFullYear()}/${now.getMonth()+1}`
+          +`?latitude=${c[4]}&longitude=${c[5]}&method=21`;
+  try{
+    const r=await fetch(url,{cache:'no-cache'});const d=await r.json();
+    if(d.code!==200||!Array.isArray(d.data))throw new Error('bad payload');
+    const month=d.data.map(day=>{
+      const t={};PRAYERS.forEach(p=>{t[p.key]=String(day.timings[p.key]).split(' ')[0]});
+      return{g:day.date.gregorian.date,t,h:{day:+day.date.hijri.day,ar:day.date.hijri.month.ar,year:+day.date.hijri.year}};
+    });
+    gSet(key,month);applyPrayer(month,now);net('ok');
+  }catch(e){
+    net('off');
+    if(!cached)setTxt($('sf-left'),'no data');
+  }
+}
+function applyPrayer(month,now){
+  const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
+  const rec=month.find(m=>m.g===dd)||month[now.getDate()-1];
+  if(!rec)return;
+  prayer=rec.t;apiHijri={day:rec.h.day,monthAr:rec.h.ar,year:rec.h.year,gDate:dd};
+  renderSpine();
+}
+function activePrayer(){
+  if(!prayer)return{act:null,nxt:null,nxtM:-1};
+  const now=new Date(),nm=now.getHours()*60+now.getMinutes();
+  let act='Isha',nxt=null,nxtM=-1;
+  for(let i=PRAYERS.length-1;i>=0;i--){const t=tMin(prayer[PRAYERS[i].key]);if(t>=0&&nm>=t){act=PRAYERS[i].key;break}}
+  for(let i=0;i<PRAYERS.length;i++){const t=tMin(prayer[PRAYERS[i].key]);if(t>nm){nxt=PRAYERS[i];nxtM=t-nm;break}}
+  if(!nxt){nxt=PRAYERS[0];nxtM=(1440-nm)+tMin(prayer.Fajr)}
+  return{act,nxt,nxtM};
+}
+
+/* ── §4 WEATHER — Open-Meteo ── */
+async function loadWeather(force){
+  const c=getCity(),key=`wx_${c[0]}`,cached=gGet(key,null);
+  if(cached){weather=cached.d;renderWeather();if(!force&&Date.now()-cached.at<30*60*1000)return}
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${c[4]}&longitude=${c[5]}`
+    +`&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m`
+    +`&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4`;
+  try{
+    const r=await fetch(url);const d=await r.json();
+    if(!d.current)throw new Error('bad payload');
+    weather=d;gSet(key,{at:Date.now(),d});renderWeather();
+  }catch{ /* the bar simply keeps its last value */ }
+}
+/* Weather lives in the status bar only. The detail is one hover away and
+   was never worth a panel on a screen this dense. */
+function renderWeather(){
+  if(!weather)return;
+  const cur=weather.current,w=WMO[cur.weather_code]||['·','—'];
+  setTxt($('b-temp'),Math.round(cur.temperature_2m)+'°');
+  setTxt($('b-wi'),w[0]);
+  const d=weather.daily;
+  let tip=`${w[1]} · feels ${Math.round(cur.apparent_temperature)}° · ${cur.relative_humidity_2m}% rh · ${Math.round(cur.wind_speed_10m)} km/h`;
+  if(d&&d.time)for(let i=1;i<Math.min(4,d.time.length);i++){
+    const dt=new Date(d.time[i]+'T12:00:00'),ww=WMO[d.weather_code[i]]||['·',''];
+    tip+=`\n${DW[dt.getDay()]}  ${ww[0]}  ${Math.round(d.temperature_2m_max[i])}° / ${Math.round(d.temperature_2m_min[i])}°`;
+  }
+  $('b-temp').parentNode.title=tip;
+}
+
+/* ── §5 SPINE ── */
+/* The rail runs Fajr-20min → Isha+3h. On a late-Isha evening that END IS PAST
+   MIDNIGHT — Isha 22:40 puts it at 01:40, i.e. minute 1540 of a 1440-minute
+   day. It used to be clamped to 1440, which compressed the last hours of the
+   rail and piled every block that ran past the clamp at 100%. The range is now
+   allowed to exceed 1440 and minutes are lifted into it by railMin(). */
+function spineRange(){
+  if(!prayer)return{a:5*60,b:23*60};
+  return{a:Math.max(0,tMin(prayer.Fajr)-20),b:tMin(prayer.Isha)+180};
+}
+/* Wall-clock minute → rail minute. 00:20 belongs to the TAIL of the evening
+   above it, not to the top of the rail, so anything before the rail's start is
+   lifted by a day. A minute that falls outside at both ends (03:00, say, which
+   is after Isha+3h and before the next Fajr-20) is snapped to whichever end it
+   is genuinely nearer, rather than always to the top. */
+function railMin(m){
+  const{a,b}=spineRange();
+  if(m>=a)return m;
+  const lifted=m+1440;
+  if(lifted<=b)return lifted;
+  return (a-m)<=(lifted-b)?m:lifted;
+}
+const nowMin=()=>{const n=new Date();return n.getHours()*60+n.getMinutes()+n.getSeconds()/60};
+function pctOf(m){const{a,b}=spineRange();return Math.max(0,Math.min(100,(railMin(m)-a)/(b-a)*100))}
+function renderSpine(){
+  const rail=$('rail');
+  [...rail.querySelectorAll('.notch,.blk,.tick')].forEach(n=>n.remove());
+  if(prayer){
+    const{nxt}=activePrayer();
+    /* Label collision — Maghrib and Isha crowd in winter. The nudge used to be
+       one-directional (always downward), so a late cluster walked Isha off the
+       bottom of the rail. Now the run is relaxed in BOTH directions around its
+       true centre: push down through the run, and if that overflows the rail,
+       shift the whole run back up and relax upward instead.
+       The TICK is drawn separately, at the true position, and never moves — so
+       a nudged label costs you nothing in accuracy. */
+    const GAP=2.4;
+    const items=PRAYERS.map(p=>({p,t:tMin(prayer[p.key])}))
+      .filter(o=>o.t>=0)
+      .map(o=>({...o,pct:pctOf(o.t),lbl:pctOf(o.t)}))
+      .sort((x,y)=>x.pct-y.pct);
+    for(let i=1;i<items.length;i++)
+      if(items[i].lbl-items[i-1].lbl<GAP)items[i].lbl=items[i-1].lbl+GAP;
+    const over=items.length?items[items.length-1].lbl-100:0;
+    if(over>0){
+      items.forEach(o=>o.lbl-=over);
+      for(let i=items.length-2;i>=0;i--)
+        if(items[i+1].lbl-items[i].lbl<GAP)items[i].lbl=items[i+1].lbl-GAP;
+      /* Six labels need 12% of the rail, so this cannot happen at any real
+         prayer spacing; it is here so the failure is a squeeze, not a label
+         floating above the rail. */
+      if(items.length&&items[0].lbl<0){const d=-items[0].lbl;items.forEach(o=>o.lbl+=d)}
+    }
+    items.forEach(({p,t,pct,lbl})=>{
+      const state=(t<=nowMin()?' pass':'')+(nxt&&nxt.key===p.key?' next':'');
+      const tk=document.createElement('div');
+      tk.className='tick'+state;tk.style.top=pct+'%';
+      rail.appendChild(tk);
+      const el=document.createElement('div');
+      el.className='notch'+state;
+      el.style.top=lbl+'%';
+      el.innerHTML=`<span class="t">${prayer[p.key]}</span><span class="d"></span><span class="n">${p.en}</span>`;
+      rail.appendChild(el);
+    });
+  }
+  let total=0,done=0;
+  todaySessions().forEach(s=>{
+    const el=document.createElement('div');
+    el.className='blk'+(s.type!=='work'?' brk':'');
+    const top=pctOf(s.startMin),bot=pctOf(s.startMin+s.min);
+    el.style.top=top+'%';el.style.height=Math.max(1.2,bot-top)+'%';
+    el.title=`${s.type} · ${s.min}m${s.label?' · '+s.label:''}`;
+    rail.appendChild(el);
+    if(s.type==='work'){total+=s.min;done++}
+  });
+  setTxt($('fr-count'),total>=60?`${Math.floor(total/60)}h ${total%60}m`:`${total}m`);
+  const pct=Math.min(100,total/cfg.goal*100),met=total>=cfg.goal;
+  const bar=$('goalbar').firstElementChild;
+  bar.style.width=pct.toFixed(1)+'%';
+  if(bar.className!==(met?'met':''))bar.className=met?'met':'';
+  const gh=Math.floor(cfg.goal/60),gm=cfg.goal%60;
+  setTxt($('fr-lbl'),met?'goal met · keep going':`of ${gh}h${gm?' '+gm+'m':''} goal`);
+  updNow();
+}
+function updNow(){
+  const p=pctOf(nowMin());
+  $('nowmark').style.top=p+'%';$('rail-elapsed').style.height=p+'%';
+  if(prayer){
+    const{nxt,nxtM}=activePrayer();
+    if(nxt){
+      const name=`${nxt.en} · <span class="ar">${esc(nxt.ar)}</span>`;
+      if($('sf-name').innerHTML!==name)$('sf-name').innerHTML=name;
+      setTxt($('sf-left'),fmtLeft(nxtM));
+    }
+  }
+}
+
+/* ── §6 LIFE GRID (canvas — never 4000 divs) ── */
+function renderLife(){
+  const cv=$('lc'),wrap=$('lcwrap'),a=calcAge(cfg.bday);
+  const curStage=a?lifeStage(a.y).label:null;
+  const lgd=LIFE_STAGES.map(st=>
+    `<span class="${st.label===curStage?'cur':''}"><i style="background:${st.color}"></i>${esc(st.label)}</span>`).join('');
+  if($('lgd').innerHTML!==lgd)$('lgd').innerHTML=lgd;
+  if(!a){
+    setTxt($('stage'),'set a birthday · s');
+    $('b-weeks').innerHTML='—<small>weeks left</small>';
+    cv.width=cv.height=1;return;
+  }
+  const exp=cfg.expect,total=exp*52;
+  const lived=Math.floor(a.ms/(7*86400000)),left=Math.max(0,total-lived);
+  setTxt($('stage'),left.toLocaleString()+' weeks left');
+  const weeksHtml=`${left.toLocaleString()}<small>weeks left</small>`;
+  if($('b-weeks').innerHTML!==weeksHtml)$('b-weeks').innerHTML=weeksHtml;
+
+  const W=wrap.clientWidth,H=wrap.clientHeight;
+  if(W<10||H<10)return;
+  /* Width and height are solved independently so the grid fills the column.
+     A week is not semantically square; empty space is the worse compromise.
+     Height is capped at 2.4x width so it never reads as a barcode. */
+  const gap=1;
+  const cw0=Math.max(2,Math.floor((W-2)/52-gap));
+  const ch0=Math.max(2,Math.min(Math.floor((H-2)/exp-gap),Math.round(cw0*2.4)));
+  const dpr=window.devicePixelRatio||1,cw=52*(cw0+gap),ch=exp*(ch0+gap);
+  cv.style.width=cw+'px';cv.style.height=ch+'px';cv.width=cw*dpr;cv.height=ch*dpr;
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,cw,ch);
+  for(let yr=0;yr<exp;yr++){
+    const col=lifeStage(yr).color;
+    for(let wk=0;wk<52;wk++){
+      const w=yr*52+wk;
+      if(w<lived){x.globalAlpha=1;x.fillStyle=col}
+      else if(w===lived){x.globalAlpha=1;x.fillStyle='#E8A33D'}
+      else{x.globalAlpha=.13;x.fillStyle=col}
+      x.fillRect(wk*(cw0+gap),yr*(ch0+gap),cw0,ch0);
+    }
+  }
+  x.globalAlpha=1;x.lineWidth=1;
+  x.strokeStyle='rgba(233,229,219,.15)';
+  for(let yr=10;yr<exp;yr+=10){const y=yr*(ch0+gap)-gap/2;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke()}
+  x.strokeStyle='rgba(95,125,242,.5)';
+  const y18=18*(ch0+gap)-gap/2;x.beginPath();x.moveTo(0,y18);x.lineTo(cw,y18);x.stroke();
+}
+
+/* ── §6b MORTALITY — one live reading, counting down ──
+   After alphabt/mortality: a fractional year is read in half a second, where
+   four unit-labelled fields must be parsed. It counts DOWN, not up — the
+   deck's whole argument is that the quantity is finite and does not pause.
+   9 decimals at 5 Hz: a second of life is the 8th decimal, so the churn is
+   identical to animation-frame rate at a twelfth of the wakeups. */
+const YEAR_MS=365.2425*86400000;
+function renderMortality(){
+  const a=calcAge(cfg.bday);
+  if(!a){
+    $('age-big').innerHTML='—';
+    $('age-bar').firstElementChild.style.width='0';
+    setTxt($('age-sub'),'set a birthday · s');return;
+  }
+  const lived=a.ms/YEAR_MS, left=Math.max(0,cfg.expect-lived);
+  const whole=Math.floor(left), frac=(left-whole).toFixed(9).slice(2);
+  const html=`${whole}<span id="age-frac">.${frac}</span>`;
+  if($('age-big').innerHTML!==html)$('age-big').innerHTML=html;
+  const pct=Math.min(100,lived/cfg.expect*100);
+  $('age-bar').firstElementChild.style.width=pct.toFixed(3)+'%';
+  setTxt($('age-sub'),`born ${isoToDmy(cfg.bday)} · ${pct.toFixed(0)}% of ${cfg.expect} yrs lived`);
+}
+
+/* ── §6c GOOGLE CALENDAR ──
+   Opt-in. Loading Google's script is the one time the deck reaches a remote
+   origin it doesn't strictly need, so it only happens after you connect.
+   The gcal-sync JSON stays the offline path and the fallback. */
+let gTok=gGet('gtok',null),gClient=null,gRenewing=null,gState='json';
+/* Renew this long before the token lapses. Google's implicit-flow token lives
+   about an hour and has NO refresh token — that is the design of the flow, not
+   an oversight — so the only way to stay live is to ask for another one before
+   the current one dies, while the Google session cookie is still good. */
+const G_EARLY=5*60*1000;
+const gLive=()=>!!(gTok&&gTok.exp>Date.now());
+function gsiLoad(){
+  return new Promise((res,rej)=>{
+    if(window.google&&google.accounts&&google.accounts.oauth2)return res();
+    const el=document.createElement('script');
+    el.src='https://accounts.google.com/gsi/client';el.async=true;
+    el.onload=()=>res();el.onerror=()=>rej(new Error('script blocked'));
+    document.head.appendChild(el);
+  });
+}
+/* One token request. silent=true passes prompt:'' — "reuse the session you
+   already have, show me nothing". If Google cannot honour that (signed out,
+   consent revoked, popup blocked because there is no user gesture) it fails and
+   we stay on the JSON path; it can never take over the screen on its own.
+   The timeout exists because a blocked popup does not always reach
+   error_callback, and a promise that never settles would wedge loadEvents. */
+function gRequest(silent){
+  return (async()=>{
+    if(!cfg.gClientId)return false;
+    try{await gsiLoad()}catch{return false}
+    return new Promise(resolve=>{
+      let done=false;const finish=ok=>{if(!done){done=true;resolve(ok)}};
+      try{
+        if(!gClient||gClient._deckId!==cfg.gClientId){
+          gClient=google.accounts.oauth2.initTokenClient({
+            client_id:cfg.gClientId,
+            scope:'https://www.googleapis.com/auth/calendar.readonly',
+            callback:r=>{
+              if(r&&r.access_token){
+                gTok={t:r.access_token,exp:Date.now()+((+r.expires_in||3600)-60)*1000};
+                gSet('gtok',gTok);gSet('gever',true);gStatus();finish(true);
+              }else finish(false);
+            },
+            error_callback:()=>finish(false),
+          });
+          gClient._deckId=cfg.gClientId;
+        }
+        gClient.requestAccessToken(silent?{prompt:''}:{});
+        setTimeout(()=>finish(false),silent?8000:60000);
+      }catch{finish(false)}
+    });
+  })();
+}
+/* Called before every agenda fetch and once a minute. Silent only — an
+   interactive prompt happens exactly once, when you click Connect. */
+async function gEnsure(){
+  if(!cfg.gClientId)return false;
+  if(gLive()&&gTok.exp-Date.now()>G_EARLY)return true;
+  if(!gGet('gever',false))return false;      /* never connected: never ask */
+  if(gRenewing)return gRenewing;
+  gRenewing=gRequest(true).then(ok=>{gRenewing=null;if(!ok){gStatus();gDot()}return ok});
+  return gRenewing;
+}
+async function gConnect(){
+  if(!cfg.gClientId)return toast('paste your OAuth client ID first');
+  const ok=await gRequest(false);
+  if(!ok)return toast('could not connect — offline, or the popup was blocked');
+  loadEvents();toast('google calendar connected');
+}
+function gDisconnect(){
+  gTok=null;gSet('gtok',null);gSet('gever',false);gStatus();loadEvents();toast('disconnected');
+}
+/* The status bar dot: lit majorelle while the week is genuinely live from
+   Google, dim the moment it is not. The whole point of the fix is that the
+   fallback stops being silent. */
+function gDot(){
+  const el=$('gdot'),live=gState==='live';
+  if(el.className!==('gdot'+(live?'':' off')))el.className='gdot'+(live?'':' off');
+  el.title=live?'agenda: google calendar, live'
+    :gState==='none'?'agenda: no feed — no google token and no JSON file'
+    :'agenda: local JSON file (gcal-sync)';
+}
+function gStatus(){
+  const on=gLive(),el=$('g-status');
+  el.className=on?'on':'';
+  setTxt(el,on?`Connected — token renews itself in the background (this one until ${new Date(gTok.exp).toTimeString().slice(0,5)}).`
+              :'Not connected — falling back to the JSON file.');
+  setTxt($('g-btn'),on?'Disconnect':'Connect Google Calendar');
+}
+const gLocal=s=>{const d=new Date(s);return `${dayKey(d)}T${P(d.getHours())}:${P(d.getMinutes())}`};
+async function gFetch(retry){
+  if(!cfg.gClientId)return null;
+  const ok=await gEnsure();
+  if(!ok||!gLive())return null;
+  const lo=new Date();lo.setDate(lo.getDate()-1);lo.setHours(0,0,0,0);
+  const hi=new Date();hi.setDate(hi.getDate()+7);hi.setHours(0,0,0,0);
+  const u='https://www.googleapis.com/calendar/v3/calendars/primary/events'
+    +`?singleEvents=true&orderBy=startTime&maxResults=250`
+    +`&timeMin=${encodeURIComponent(lo.toISOString())}&timeMax=${encodeURIComponent(hi.toISOString())}`;
+  try{
+    const r=await fetch(u,{headers:{Authorization:'Bearer '+gTok.t}});
+    if(r.status===401||r.status===403){
+      /* the token was rejected early — drop it and try ONE silent renewal
+         before giving the week back to the JSON file */
+      gTok=null;gSet('gtok',null);gStatus();
+      if(retry===false)return null;
+      return await gEnsure()?gFetch(false):null;
+    }
+    const d=await r.json();
+    return (d.items||[]).map(e=>({
+      start:e.start.dateTime?gLocal(e.start.dateTime):e.start.date,
+      end:e.end?(e.end.dateTime?gLocal(e.end.dateTime):e.end.date):'',
+      title:e.summary||'untitled',allDay:!e.start.dateTime,
+    }));
+  }catch{return null}
+}
+
+/* ── §7 THE WEEK — yesterday → today+6 ── */
+function groupEvents(list){
+  const map={};
+  list.forEach(e=>{const k=String(e.start).slice(0,10);(map[k]=map[k]||[]).push(e)});
+  Object.values(map).forEach(v=>v.sort((a,b)=>String(a.start).localeCompare(String(b.start))));
+  return map;
+}
+async function loadEvents(){
+  const g=await gFetch();
+  if(g){eventsByDay=groupEvents(g);gState='live';gDot();renderWeek();return}
+  try{
+    const r=await fetch(cfg.icsPath,{cache:'no-cache'});
+    if(!r.ok)throw new Error('missing');
+    const raw=await r.json();
+    eventsByDay=groupEvents(Array.isArray(raw)?raw:(raw.events||[]));
+    gState='json';
+  }catch{eventsByDay=null;gState='none'}
+  gDot();renderWeek();
+}
+/* One string per DAY CELL, not one string for the grid. A single event moving
+   used to restring all eight columns and hand the browser a fresh innerHTML for
+   the whole grid every minute; now only the cell that actually changed is
+   touched, and the other seven keep their nodes. */
+let weekCells=[],lastCell=[];
+function renderWeek(){
+  const base=new Date(),nm=nowMin(),todayK=dayKey(base);
+  const days=[];for(let i=-1;i<=6;i++)days.push(addDays(base,i));
+  setTxt($('weekrange'),`${days[0].getDate()} ${EN_M[days[0].getMonth()].slice(0,3)} — ${days[7].getDate()} ${EN_M[days[7].getMonth()].slice(0,3)}`);
+  if(!weekCells.length||weekCells[0].parentNode!==$('week')){
+    $('week').innerHTML=days.map(()=>'<div class="day"></div>').join('');
+    weekCells=[...$('week').children];lastCell=[];
+  }
+  days.forEach((d,i)=>{
+    const k=dayKey(d),isToday=k===todayK,isPast=k<todayK;
+    const evs=(eventsByDay&&eventsByDay[k])||[];
+    let body;
+    if(eventsByDay===null&&isToday) body='<div class="dfree">NO FEED</div>';
+    else if(!evs.length)            body='<div class="dfree">—</div>';
+    else{
+      body=evs.slice(0,5).map(e=>{
+        const allDay=e.allDay||String(e.start).length<=10;
+        const t=allDay?'all day':String(e.start).slice(11,16);
+        const s=allDay?0:tMin(t);
+        const re=tMin(String(e.end||'').slice(11,16)),en=re>=0?re:s+60;
+        let cls='chip';
+        if(allDay)cls+=' allday';
+        else if(isPast||(isToday&&nm>en))cls+=' done';
+        else if(isToday&&nm>=s&&nm<=en)cls+=' now';
+        return `<div class="${cls}" title="${esc(e.title||'')}"><div class="ct">${esc(t)}</div><div class="cn">${esc(e.title||'untitled')}</div></div>`;
+      }).join('');
+      if(evs.length>5)body+=`<div class="more">+${evs.length-5}</div>`;
+    }
+    const cls='day'+(isToday?' today':'')+(isPast?' past':'');
+    const html=`<div class="dhead"><div class="dw">${DW[d.getDay()]}</div><div class="dn">${d.getDate()}</div></div>`
+      +`<div class="dbody">${body}</div>`;
+    const cell=weekCells[i];
+    if(cell.className!==cls)cell.className=cls;
+    if(lastCell[i]!==html){cell.innerHTML=html;lastCell[i]=html}
+  });
+}
+
+/* ── §8 POMODORO — wall-clock truth, demoted to a strip ── */
+const pom={phase:'work',running:false,endsAt:0,remain:cfg.work*60*1000,done:0,label:'',startedMin:null};
+const phaseMin=()=>pom.phase==='work'?cfg.work:pom.phase==='short'?cfg.short:cfg.long;
+const pomRemain=()=>pom.running?Math.max(0,pom.endsAt-Date.now()):pom.remain;
+const saveLive=()=>gSet('live',pom.running?{phase:pom.phase,endsAt:pom.endsAt,done:pom.done,label:pom.label,startedMin:pom.startedMin}:null);
+function pomStart(){
+  if(pom.running)return;
+  if(pom.startedMin===null)pom.startedMin=Math.round(nowMin()); /* recorded once per phase */
+  pom.running=true;pom.endsAt=Date.now()+pom.remain;saveLive();
+  if(typeof Notification!=='undefined'&&Notification.permission==='default')
+    Notification.requestPermission().catch(()=>{});
+  renderPom();
+}
+function pomPause(){if(!pom.running)return;pom.remain=pomRemain();pom.running=false;saveLive();renderPom()}
+function pomToggle(){pom.running?pomPause():pomStart()}
+function pomReset(){pom.running=false;pom.startedMin=null;pom.remain=phaseMin()*60*1000;saveLive();renderPom()}
+function pomNext(complete){
+  if(complete&&pom.startedMin!==null)
+    pushSession({type:pom.phase,min:phaseMin(),startMin:pom.startedMin,label:pom.label});
+  if(pom.phase==='work'){pom.done++;pom.phase=(pom.done%cfg.cycle===0)?'long':'short'}
+  else pom.phase='work';
+  pom.startedMin=null;pom.running=false;pom.remain=phaseMin()*60*1000;
+  saveLive();renderPom();renderSpine();
+}
+function pomFinish(){beep();notify(pom.phase==='work'?'Focus done':'Break over',pom.label||getCity()[3]);pomNext(true)}
+let lastTitle='';
+function renderPom(){
+  const ms=pomRemain(),txt=`${P(Math.floor(ms/60000))}:${P(Math.floor(ms%60000/1000))}`;
+  const big=$('clockbig');setTxt(big,txt);
+  const bc=pom.running?(pom.phase==='work'?'run':'brk'):'';
+  if(big.className!==bc)big.className=bc;
+  const ph=$('phase');
+  setTxt(ph,pom.phase==='work'?'focus':pom.phase==='short'?'short break':'long break');
+  const pc=pom.phase==='work'?'':'brk';
+  if(ph.className!==pc)ph.className=pc;
+  const title=`${txt} ${pom.running?'▸':'‖'} ${pom.phase==='work'?'focus':'break'}${pom.label?' — '+pom.label:''}`;
+  if(title!==lastTitle){document.title=title;lastTitle=title}
+  const inCycle=pom.phase==='long'?cfg.cycle:pom.done%cfg.cycle;
+  const dots=Array.from({length:cfg.cycle},(_,i)=>
+    `<div class="dot4${i<inCycle?' on':''}${(i===inCycle&&pom.phase==='work')?' cur':''}"></div>`).join('');
+  if($('dots').innerHTML!==dots)$('dots').innerHTML=dots;
+  let w='';
+  if(pom.running&&prayer){
+    const{nxt,nxtM}=activePrayer(),mins=Math.ceil(ms/60000);
+    if(nxt&&nxtM<mins)w=`⚠ ${nxt.en} in ${nxtM}m — this session overruns by ${mins-nxtM}m`;
+  }
+  setTxt($('warn'),w);
+}
+function beep(){
+  try{
+    const A=new (window.AudioContext||window.webkitAudioContext)(),o=A.createOscillator(),g=A.createGain();
+    o.type='sine';o.frequency.value=660;o.connect(g);g.connect(A.destination);
+    g.gain.setValueAtTime(.0001,A.currentTime);
+    g.gain.exponentialRampToValueAtTime(.22,A.currentTime+.02);
+    g.gain.exponentialRampToValueAtTime(.0001,A.currentTime+.9);
+    o.start();o.stop(A.currentTime+.95);
+  }catch{}
+}
+function notify(t,b){try{if(Notification.permission==='granted')new Notification(t,{body:b})}catch{}}
+
+/* ── §8b ADHAN PILL — 3s drop-in, once per prayer per day, Sunrise excluded ── */
+const ADHAN_MS=3000;let adhanT;
+function adhanPill(p,time){
+  const el=$('adhan');
+  el.innerHTML=`<span class="ic">🕌</span><div><div class="ttl ar">حان وقت صلاة ${esc(p.ar)}</div>`
+    +`<div class="sub">${esc(p.en)} · ${esc(getCity()[3])}</div></div><span class="tm">${esc(time)}</span>`;
+  el.classList.add('show');clearTimeout(adhanT);
+  adhanT=setTimeout(()=>el.classList.remove('show'),ADHAN_MS);
+  beep();notify('حان وقت صلاة '+p.ar,`${p.en} · ${time} · ${getCity()[3]}`);
+}
+function checkAdhan(now){
+  if(!prayer)return;
+  const nm=now.getHours()*60+now.getMinutes(),seen=gGet('adhanSeen',{});
+  for(const p of PRAYERS){
+    if(p.key==='Sunrise')continue;
+    const t=tMin(prayer[p.key]);
+    if(t<0||nm!==t)continue;
+    const id=dayKey(now)+'|'+p.key;
+    if(seen.id===id)return;
+    gSet('adhanSeen',{id});adhanPill(p,prayer[p.key]);return;
+  }
+}
+
+/* ── §9 TICK ── */
+let lastDay=dayKey(new Date()),lastTs=Date.now();
+function tick(){
+  const now=new Date();
+  /* a >90s gap between ticks means the laptop slept — resync from wall clock */
+  const jumped=Date.now()-lastTs>90000;lastTs=Date.now();
+  setTxt($('c-clock'),`${P(now.getHours())}:${P(now.getMinutes())}:${P(now.getSeconds())}`);
+  setTxt($('c-greg'),`${now.getDate()} ${EN_M[now.getMonth()]} ${now.getFullYear()}`);
+  const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
+  const h=(apiHijri&&apiHijri.gDate===dd)
+    ?{d:apiHijri.day,m:apiHijri.monthAr,y:apiHijri.year}
+    :(()=>{const x=toHijri(now.getFullYear(),now.getMonth(),now.getDate());return{d:x.day,m:HIJRI_M[x.month-1],y:x.year}})();
+  setTxt($('c-hij'),`${h.d} ${h.m} ${h.y} هـ`);
+  setTxt($('b-city'),getCity()[2]);
+  renderPom();checkAdhan(now);
+  if(pom.running&&pomRemain()<=0)pomFinish();
+  if(now.getSeconds()%5===0)updNow();
+  if(now.getSeconds()===0)renderWeek();
+  const k=dayKey(now);
+  if(k!==lastDay||jumped){
+    lastDay=k;loadPrayer(true);loadWeather(true);loadEvents();renderLife();renderSpine();
+  }
+}
+
+/* ── §10 OVERLAYS + KEYBOARD ── */
+let openOv=null;
+const show=id=>{closeOv();openOv=id;$(id).classList.add('show')};
+const closeOv=()=>{if(openOv){$(openOv).classList.remove('show');openOv=null}};
+let palItems=[],palSel=0;
+function buildPal(q){
+  const n=norm(q),out=[];
+  const cmds=[
+    ['start / pause',()=>pomToggle()],['reset phase',()=>pomReset()],['skip phase',()=>pomNext(false)],
+    ['set intention',()=>askIntent()],['settings',()=>show('ov-set')],['keys',()=>show('ov-help')],
+    ['connect google calendar',()=>gConnect()],
+    ['refetch everything',()=>{loadPrayer(true);loadWeather(true);loadEvents();toast('refetching')}],
+    ['preview adhan pill',()=>{const{nxt}=activePrayer(),p=nxt||PRAYERS[0];adhanPill(p,prayer?prayer[p.key]:'--:--')}],
+    ['enable notifications',()=>Notification.requestPermission().then(p=>toast('notifications: '+p))],
+    ['clear today’s sessions',()=>{const a=gGet('sessions',{});delete a[dayKey(new Date())];gSet('sessions',a);renderSpine();toast('cleared')}],
+  ];
+  cmds.forEach(([label,fn])=>{if(!n||norm(label).includes(n))out.push({k:'cmd',label,sub:'',fn})});
+  CITIES.forEach((c,i)=>{
+    if(!n||norm(c[2]).includes(n)||norm(c[3]).includes(n)||c[1].includes(q))
+      out.push({k:'city',label:c[2],sub:c[1],fn:()=>setCity(i)});
+  });
+  return out.slice(0,40);
+}
+function renderPal(q){
+  palItems=buildPal(q);if(palSel>=palItems.length)palSel=0;
+  $('pal-list').innerHTML=palItems.map((it,i)=>
+    `<div class="pi${i===palSel?' sel':''}" data-i="${i}"><span class="k">${it.k}</span><span>${esc(it.label)}</span><span class="sub ar">${esc(it.sub)}</span></div>`).join('');
+  const s=$('pal-list').querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});
+}
+function openPal(){show('ov-pal');palSel=0;$('pal-in').value='';renderPal('');setTimeout(()=>$('pal-in').focus(),0)}
+$('pal-in').addEventListener('input',e=>{palSel=0;renderPal(e.target.value)});
+$('pal-list').addEventListener('click',e=>{const it=e.target.closest('.pi');if(it){const f=palItems[+it.dataset.i].fn;closeOv();f()}});
+function setCity(i){cfg.city=i;gSet('city',i);loadPrayer(true);loadWeather(true);toast('city → '+getCity()[2])}
+function askIntent(){
+  const v=prompt('What is this session for?',pom.label||'');
+  if(v===null)return;
+  pom.label=v.trim();
+  const el=$('intent');
+  el.textContent=pom.label||'press i to name this session';
+  el.classList.toggle('empty',!pom.label);
+  lastTitle='';renderPom();saveLive();
+}
+[['f-exp','expect','num'],['f-work','work','num'],['f-short','short','num'],
+ ['f-long','long','num'],['f-cyc','cycle','num'],['f-goal','goal','num'],
+ ['f-ics','icsPath','str'],['f-gid','gClientId','str']].forEach(([id,key,type])=>{
+  const el=$(id);el.value=cfg[key];
+  el.addEventListener('input',()=>{
+    cfg[key]=type==='num'?(+el.value||cfg[key]):el.value;
+    gSet(key,cfg[key]);renderLife();renderMortality();renderSpine();
+    if(!pom.running&&['work','short','long'].includes(key))pomReset();
+    if(key==='icsPath')loadEvents();
+  });
+});
+/* birthday: typed as dd/mm/yyyy, stored as ISO, slashes inserted as you go */
+(function bindBday(){
+  const el=$('f-bday');el.value=isoToDmy(cfg.bday);
+  el.addEventListener('input',()=>{
+    let d=el.value.replace(/\D/g,'').slice(0,8);
+    let v=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`
+         :d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d;
+    if(v!==el.value)el.value=v;
+    const iso=dmyToIso(v);
+    el.classList.toggle('bad',v.length===10&&!iso);
+    if(iso){cfg.bday=iso;gSet('bday',iso);renderLife();renderMortality()}
+  });
+})();
+$('g-btn').addEventListener('click',()=>{(gTok&&gTok.exp>Date.now())?gDisconnect():gConnect()});
+document.addEventListener('keydown',e=>{
+  const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if(e.key==='Escape'){closeOv();if(typing)e.target.blur();return}
+  if(openOv==='ov-pal'){
+    if(e.key==='ArrowDown'||(e.ctrlKey&&e.key==='n')){e.preventDefault();palSel=Math.min(palItems.length-1,palSel+1);renderPal($('pal-in').value)}
+    else if(e.key==='ArrowUp'||(e.ctrlKey&&e.key==='p')){e.preventDefault();palSel=Math.max(0,palSel-1);renderPal($('pal-in').value)}
+    else if(e.key==='Enter'){e.preventDefault();const it=palItems[palSel];closeOv();if(it)it.fn()}
+    return;
+  }
+  if(typing)return;
+  if(e.ctrlKey&&e.key==='k'){e.preventDefault();openPal();return}
+  if(e.ctrlKey||e.altKey||e.metaKey)return;
+  switch(e.key){
+    case ' ':e.preventDefault();pomToggle();break;
+    case 'r':pomReset();toast('phase reset');break;
+    case 'n':pomNext(false);toast('skipped');break;
+    case 'i':e.preventDefault();askIntent();break;
+    case 'c':case ':':e.preventDefault();openPal();break;
+    case 's':e.preventDefault();show('ov-set');setTimeout(()=>$('f-bday').focus(),0);break;
+    case '?':e.preventDefault();show('ov-help');break;
+    case 'R':loadPrayer(true);loadWeather(true);loadEvents();toast('refetching');break;
+  }
+});
+document.querySelectorAll('.ov').forEach(o=>o.addEventListener('mousedown',e=>{if(e.target===o)closeOv()}));
+$('intent').addEventListener('click',askIntent);
+
+/* ── §11 BOOT ── */
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{renderLife();renderMortality();renderSpine();renderWeek()},120)});
+window.addEventListener('online',()=>{loadPrayer(true);loadWeather(true);loadEvents()});
+window.addEventListener('beforeunload',saveLive);
+
+(function boot(){
+  const live=gGet('live',null);
+  if(live&&live.endsAt>Date.now()){
+    /* a running session survives a reload, an X restart, or a crash */
+    pom.phase=live.phase;pom.done=live.done;pom.label=live.label||'';
+    pom.startedMin=live.startedMin;pom.endsAt=live.endsAt;pom.running=true;
+    if(pom.label){$('intent').textContent=pom.label;$('intent').classList.remove('empty')}
+  }else{pom.remain=cfg.work*60*1000;gSet('live',null)}
+  renderPom();renderLife();renderMortality();renderSpine();renderWeek();gStatus();gDot();
+  loadPrayer(false);loadWeather(false);loadEvents();
+  tick();setInterval(tick,1000);
+  setInterval(renderMortality,200);   /* 5 Hz — the churn reads as continuous */
+  setInterval(()=>loadWeather(false),30*60*1000);
+  setInterval(()=>loadEvents(),10*60*1000);
+  setInterval(gEnsure,60*1000);       /* renew the Google token before it lapses */
+  if(!cfg.bday)setTimeout(()=>toast('press s to set your birthday'),1200);
+})();
+</script>
+</body>
+</html>

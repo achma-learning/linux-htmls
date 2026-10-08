@@ -1,0 +1,109 @@
+/*
+ * macos-adjacent.rasi — Spotlight-style launcher for this i3 setup.
+ *
+ * Written against rofi 2.0.0, using the installed rofi-theme(5) and the
+ * version-matched examples in /usr/share/rofi/themes/. Not adapted from
+ * rofi 1.7-era material.
+ *
+ * Syntax confirmed against the installed manpages:
+ *   `* { }` variables via @name   rofi-theme(5) "Getting started"
+ *   element selected { }          rofi-theme(5):756,769
+ *   border-radius                 rofi-theme(5):891
+ *   location                      rofi-theme(5):922
+ *
+ * Layout: one rounded input row, results directly below, whole panel centred
+ * and translucent. picom supplies the blur behind it (blur-background = true
+ * in ~/i3-setup/picom.conf) — the translucency here is what lets it show.
+ */
+
+* {
+    /* Light, to match the light GTK theme. */
+    bg:          #f4f4f4e6;   /* e6 alpha: picom blurs whatever is behind */
+    bg-input:    #ffffffff;
+    bg-selected: #d6d9dcff;
+    fg:          #1c1c1eff;
+    fg-dim:      #8a8a8eff;
+    accent:      #3a76c4ff;
+
+    background-color: transparent;
+    text-color:       @fg;
+    font:             "Noto Sans 12";
+}
+
+/* One centred panel, 45% of screen width. */
+window {
+    location:         center;
+    anchor:           center;
+    width:            45%;
+    background-color: @bg;
+    border-radius:    14px;
+    border:           0px;
+    padding:          10px;
+}
+
+mainbox {
+    spacing:  10px;
+    padding:  0px;
+    children: [ inputbar, listview ];
+}
+
+/* The single rounded input row. */
+inputbar {
+    background-color: @bg-input;
+    border-radius:    10px;
+    padding:          12px 14px;
+    spacing:          10px;
+    children:         [ prompt, entry ];
+}
+
+prompt {
+    text-color:     @accent;
+    vertical-align: 0.5;
+}
+
+entry {
+    placeholder:       "Spotlight Search";
+    placeholder-color: @fg-dim;
+    vertical-align:    0.5;
+    cursor:            text;
+}
+
+/* Results below. fixed-height false shrinks the panel to a bare input row
+   when nothing matches, which is the Spotlight behaviour. */
+listview {
+    lines:        8;
+    scrollbar:    false;
+    fixed-height: false;
+    spacing:      2px;
+    padding:      0px;
+}
+
+element {
+    padding:       9px 12px;
+    border-radius: 8px;
+    spacing:       12px;
+    children:      [ element-icon, element-text ];
+    cursor:        pointer;
+}
+
+element-icon {
+    size:           1.2em;
+    vertical-align: 0.5;
+}
+
+element-text {
+    vertical-align: 0.5;
+    text-color:     inherit;
+}
+
+element normal normal    { text-color: @fg; }
+element alternate normal { text-color: @fg; }
+
+element selected {
+    background-color: @bg-selected;
+    text-color:       @fg;
+}
+
+element urgent {
+    text-color: #c0392bff;
+}
