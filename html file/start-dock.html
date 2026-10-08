@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>deck</title>
+<title>Deck</title>
 <style>
 /* ══════════ TOKENS ══════════
    Colour is state, never decoration:
@@ -336,6 +336,13 @@ button:hover{border-color:var(--saffron)}
     <div class="frow"><label>Sessions per cycle</label><input type="number" id="f-cyc" min="2" max="8"></div>
     <div class="frow"><label>Daily focus goal (min)</label><input type="number" id="f-goal" min="30" max="900" step="30"></div>
     <div class="sep">
+      <span class="lbl">Prayer</span>
+      <div class="frow"><label>Remind before adhan (min)</label><input type="number" id="f-pre" min="0" max="60"></div>
+      <div class="frow"><label>Hijri date offset (days)</label><input type="number" id="f-hadj" min="-2" max="2"></div>
+      <div class="hint" style="margin-top:0">0 turns the early reminder off. Morocco's official Hijri date
+      (Ministry of Habous, by moon sighting) can sit a day off the computed one — nudge it here.</div>
+    </div>
+    <div class="sep">
       <span class="lbl">Agenda</span>
       <div class="frow"><label>Google OAuth client ID</label><input id="f-gid" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false"></div>
       <div class="frow"><label></label><button id="g-btn" type="button">Connect Google Calendar</button></div>
@@ -357,7 +364,7 @@ button:hover{border-color:var(--saffron)}
     <tr><td>r</td><td>reset the current phase</td></tr>
     <tr><td>n</td><td>skip to the next phase</td></tr>
     <tr><td>i</td><td>name this session</td></tr>
-    <tr><td>c &nbsp;:&nbsp; ctrl+k</td><td>command palette — cities and actions</td></tr>
+    <tr><td>c &nbsp;:&nbsp; ctrl+k</td><td>command palette — cities, nearest city, actions</td></tr>
     <tr><td>s</td><td>settings</td></tr>
     <tr><td>R</td><td>refetch prayer, weather and agenda</td></tr>
     <tr><td>?</td><td>this list</td></tr>
@@ -372,12 +379,14 @@ button:hover{border-color:var(--saffron)}
 <script>
 "use strict";
 /* ════════════════════════════════════════════════════════════════
-   deck v0.2 — a read-only orientation console.
+   deck v0.3 — a read-only orientation console.
    Ported from “Time Island & Sidebar Widgets” v5.0.1 (Achma, MIT).
    Kept verbatim: CITIES, PRAYERS, toHijri(), LIFE_STAGES, calcAge().
    Replaced: GM_* → localStorage · GM_xmlhttpRequest → fetch
              wttr.in → Open-Meteo (CORS) · daily timings → cached month
    Evicted in v0.2: the prayer grid — the spine renders it strictly better.
+   v0.3: early adhan reminder · Jumuʿa / iftar names · Hijri offset ·
+         nearest city · alerts survive tab throttling · more cities.
    ════════════════════════════════════════════════════════════════ */
 
 /* ── §0 DATA ── */
@@ -402,6 +411,16 @@ const CITIES=[
  [139,'تنغير','Tinghir','Tinghir',31.51,-5.53],[149,'كلميم','Guelmim','Guelmim',28.98,-10.06],
  [152,'طانطان','Tan-Tan','Tan-Tan',28.44,-11.10],[156,'العيون','Laâyoune','Laayoune',27.13,-13.16],
  [165,'الداخلة','Dakhla','Dakhla',23.68,-15.96],[148,'سيدي إفني','Sidi Ifni','Sidi Ifni',29.38,-10.17],
+ /* appended in v0.3 — cfg.city stores an INDEX, so new cities only ever go at the end */
+ [201,'سلا','Salé','Sale',34.05,-6.80],[202,'تمارة','Témara','Temara',33.93,-6.91],
+ [203,'العرائش','Larache','Larache',35.19,-6.16],[204,'القصر الكبير','Ksar El Kébir','Ksar El Kebir',35.00,-5.90],
+ [205,'الخميسات','Khémisset','Khemisset',33.82,-6.07],[206,'بركان','Berkane','Berkane',34.92,-2.32],
+ [207,'تاوريرت','Taourirt','Taourirt',34.41,-2.90],[208,'خنيفرة','Khénifra','Khenifra',32.94,-5.67],
+ [209,'صفرو','Sefrou','Sefrou',33.83,-4.83],[210,'إنزكان','Inezgane','Inezgane',30.36,-9.54],
+ [211,'قلعة السراغنة','El Kelâa des Sraghna','El Kelaa des Sraghna',32.05,-7.41],[212,'اليوسفية','Youssoufia','Youssoufia',32.25,-8.53],
+ [213,'الفقيه بن صالح','Fquih Ben Salah','Fquih Ben Salah',32.50,-6.69],[214,'أزيلال','Azilal','Azilal',31.96,-6.57],
+ [215,'فكيك','Figuig','Figuig',32.11,-1.23],[216,'السمارة','Smara','Smara',26.74,-11.67],
+ [217,'بوجدور','Boujdour','Boujdour',26.13,-14.48],
 ];
 const PRAYERS=[
  {key:'Fajr',ar:'الفجر',en:'Fajr'},{key:'Sunrise',ar:'الشروق',en:'Shuruq'},
@@ -487,9 +506,11 @@ const cfg={
   work:gGet('work',25),short:gGet('short',5),long:gGet('long',15),cycle:gGet('cycle',4),
   icsPath:gGet('icsPath','./data/events.json'),
   goal:gGet('goal',240),          /* 4h of real focus, every day */
+  pre:gGet('pre',10),             /* minutes of warning before each adhan; 0 = off */
+  hadj:gGet('hadj',0),            /* Hijri offset in days, for the official Moroccan date */
   gClientId:gGet('gClientId',''),
 };
-let prayer=null,apiHijri=null,weather=null,eventsByDay=null;
+let prayer=null,prayerMonth=null,weather=null,eventsByDay=null;
 const getCity=()=>CITIES[cfg.city]||CITIES[22];
 function todaySessions(){const a=gGet('sessions',{});return a[dayKey(new Date())]||[]}
 function pushSession(rec){
@@ -513,9 +534,9 @@ async function loadPrayer(force){
     if(d.code!==200||!Array.isArray(d.data))throw new Error('bad payload');
     const month=d.data.map(day=>{
       const t={};PRAYERS.forEach(p=>{t[p.key]=String(day.timings[p.key]).split(' ')[0]});
-      return{g:day.date.gregorian.date,t,h:{day:+day.date.hijri.day,ar:day.date.hijri.month.ar,year:+day.date.hijri.year}};
+      return{g:day.date.gregorian.date,t,h:{day:+day.date.hijri.day,ar:day.date.hijri.month.ar,n:+day.date.hijri.month.number,year:+day.date.hijri.year}};
     });
-    gSet(key,month);applyPrayer(month,now);net('ok');
+    gSet(key,month);prunePrayerCache();applyPrayer(month,now);net('ok');
   }catch(e){
     net('off');
     if(!cached)setTxt($('sf-left'),'no data');
@@ -525,8 +546,40 @@ function applyPrayer(month,now){
   const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
   const rec=month.find(m=>m.g===dd)||month[now.getDate()-1];
   if(!rec)return;
-  prayer=rec.t;apiHijri={day:rec.h.day,monthAr:rec.h.ar,year:rec.h.year,gDate:dd};
+  prayer=rec.t;prayerMonth=month;
   renderSpine();
+}
+/* A month of timings is cached per city, and nothing ever removed the old
+   ones — a year of city-hopping is a few hundred KB of dead localStorage.
+   Every month but the current one goes; other cities' current month stays, so
+   switching back is still instant and offline. */
+function prunePrayerCache(){
+  const now=new Date(),cur=`_${now.getFullYear()}_${now.getMonth()+1}`;
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('deck_pray_')&&!k.endsWith(cur))localStorage.removeItem(k);
+    }
+    localStorage.removeItem('deck_adhanSeen');   /* superseded by deck_alerts in v0.3 */
+  }catch{}
+}
+/* Today's Hijri date, shifted by cfg.hadj. Prefers AlAdhan's value for the
+   shifted day when the cached month has it; otherwise the tabular algorithm. */
+function hijriFor(now){
+  const s=addDays(now,cfg.hadj|0);
+  const dd=`${P(s.getDate())}-${P(s.getMonth()+1)}-${s.getFullYear()}`;
+  const rec=prayerMonth&&prayerMonth.find(m=>m.g===dd);
+  const x=toHijri(s.getFullYear(),s.getMonth(),s.getDate());
+  if(rec)return{d:rec.h.day,m:rec.h.ar,n:rec.h.n||x.month,y:rec.h.year};
+  return{d:x.day,m:HIJRI_M[x.month-1],n:x.month,y:x.year};
+}
+/* The name a prayer goes by TODAY: Dhuhr is Jumuʿa on a Friday, and Maghrib is
+   the iftar in Ramadan. Names only — the times are untouched. */
+function pName(p,now){
+  now=now||new Date();
+  if(p.key==='Dhuhr'&&now.getDay()===5)return{en:'Jumuʿa',ar:'الجمعة'};
+  if(p.key==='Maghrib'&&hijriFor(now).n===9)return{en:'Iftar',ar:p.ar};
+  return{en:p.en,ar:p.ar};
 }
 function activePrayer(){
   if(!prayer)return{act:null,nxt:null,nxtM:-1};
@@ -628,7 +681,7 @@ function renderSpine(){
       const el=document.createElement('div');
       el.className='notch'+state;
       el.style.top=lbl+'%';
-      el.innerHTML=`<span class="t">${prayer[p.key]}</span><span class="d"></span><span class="n">${p.en}</span>`;
+      el.innerHTML=`<span class="t">${prayer[p.key]}</span><span class="d"></span><span class="n">${esc(pName(p).en)}</span>`;
       rail.appendChild(el);
     });
   }
@@ -657,7 +710,7 @@ function updNow(){
   if(prayer){
     const{nxt,nxtM}=activePrayer();
     if(nxt){
-      const name=`${nxt.en} · <span class="ar">${esc(nxt.ar)}</span>`;
+      const nn=pName(nxt),name=`${esc(nn.en)} · <span class="ar">${esc(nn.ar)}</span>`;
       if($('sf-name').innerHTML!==name)$('sf-name').innerHTML=name;
       setTxt($('sf-left'),fmtLeft(nxtM));
     }
@@ -955,14 +1008,23 @@ function renderPom(){
   let w='';
   if(pom.running&&prayer){
     const{nxt,nxtM}=activePrayer(),mins=Math.ceil(ms/60000);
-    if(nxt&&nxtM<mins)w=`⚠ ${nxt.en} in ${nxtM}m — this session overruns by ${mins-nxtM}m`;
+    if(nxt&&nxtM<mins)w=`⚠ ${pName(nxt).en} in ${nxtM}m — this session overruns by ${mins-nxtM}m`;
   }
   setTxt($('warn'),w);
 }
-function beep(){
+/* ONE AudioContext for the life of the page. A new one per beep was never
+   closed, and browsers cap how many may exist — after enough beeps the deck
+   went silent. A context made before any user gesture also starts suspended
+   under autoplay rules, so the first click or key primes it. */
+let audio=null;
+function audioCtx(){audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();return audio}
+const primeAudio=()=>{try{audioCtx()}catch{}};
+document.addEventListener('pointerdown',primeAudio,{once:true});
+document.addEventListener('keydown',primeAudio,{once:true});
+function beep(freq){
   try{
-    const A=new (window.AudioContext||window.webkitAudioContext)(),o=A.createOscillator(),g=A.createGain();
-    o.type='sine';o.frequency.value=660;o.connect(g);g.connect(A.destination);
+    const A=audioCtx(),o=A.createOscillator(),g=A.createGain();
+    o.type='sine';o.frequency.value=freq||660;o.connect(g);g.connect(A.destination);
     g.gain.setValueAtTime(.0001,A.currentTime);
     g.gain.exponentialRampToValueAtTime(.22,A.currentTime+.02);
     g.gain.exponentialRampToValueAtTime(.0001,A.currentTime+.9);
@@ -971,47 +1033,72 @@ function beep(){
 }
 function notify(t,b){try{if(Notification.permission==='granted')new Notification(t,{body:b})}catch{}}
 
-/* ── §8b ADHAN PILL — 3s drop-in, once per prayer per day, Sunrise excluded ── */
+/* ── §8b ADHAN PILL — 3s drop-in, once per prayer per day, Sunrise excluded ──
+   Two alerts per prayer: the adhan itself, and an early reminder cfg.pre
+   minutes before it (enough to finish a thought and make wudu). */
 const ADHAN_MS=3000;let adhanT;
-function adhanPill(p,time){
+function showPill(ic,ttl,sub,time){
   const el=$('adhan');
-  el.innerHTML=`<span class="ic">🕌</span><div><div class="ttl ar">حان وقت صلاة ${esc(p.ar)}</div>`
-    +`<div class="sub">${esc(p.en)} · ${esc(getCity()[3])}</div></div><span class="tm">${esc(time)}</span>`;
+  el.innerHTML=`<span class="ic">${ic}</span><div><div class="ttl ar">${esc(ttl)}</div>`
+    +`<div class="sub">${esc(sub)}</div></div><span class="tm">${esc(time)}</span>`;
   el.classList.add('show');clearTimeout(adhanT);
   adhanT=setTimeout(()=>el.classList.remove('show'),ADHAN_MS);
-  beep();notify('حان وقت صلاة '+p.ar,`${p.en} · ${time} · ${getCity()[3]}`);
 }
+function adhanPill(p,time){
+  const n=pName(p),city=getCity()[3];
+  showPill('🕌','حان وقت صلاة '+n.ar,`${n.en} · ${city}`,time);
+  beep();notify('حان وقت صلاة '+n.ar,`${n.en} · ${time} · ${city}`);
+}
+function prePill(p,time,left){
+  const n=pName(p),city=getCity()[3];
+  showPill('⏳','اقترب وقت صلاة '+n.ar,`${n.en} in ${left} min · ${city}`,time);
+  beep(520);notify(`${n.en} in ${left} min`,`${time} · ${city}`);
+}
+/* A hidden tab has its timers throttled to as little as once a minute, so the
+   old exact-minute match could skip an adhan entirely. Each alert now has a
+   window of ALERT_WIN minutes, and a per-day list of what already fired keeps
+   it to exactly once. */
+const ALERT_WIN=3;
 function checkAdhan(now){
   if(!prayer)return;
-  const nm=now.getHours()*60+now.getMinutes(),seen=gGet('adhanSeen',{});
+  const nm=now.getHours()*60+now.getMinutes(),day=dayKey(now);
+  let seen=gGet('alerts',null);
+  if(!seen||seen.d!==day||!Array.isArray(seen.ids))seen={d:day,ids:[]};
   for(const p of PRAYERS){
     if(p.key==='Sunrise')continue;
-    const t=tMin(prayer[p.key]);
-    if(t<0||nm!==t)continue;
-    const id=dayKey(now)+'|'+p.key;
-    if(seen.id===id)return;
-    gSet('adhanSeen',{id});adhanPill(p,prayer[p.key]);return;
+    const t=tMin(prayer[p.key]);if(t<0)continue;
+    let kind=null;
+    if(nm>=t&&nm<t+ALERT_WIN)kind='adhan';
+    else if(cfg.pre>0&&nm>=t-cfg.pre&&nm<Math.min(t,t-cfg.pre+ALERT_WIN))kind='pre';
+    if(!kind)continue;
+    const id=p.key+'|'+kind;
+    if(seen.ids.includes(id))continue;
+    seen.ids.push(id);gSet('alerts',seen);
+    kind==='adhan'?adhanPill(p,prayer[p.key]):prePill(p,prayer[p.key],t-nm);
+    return;
   }
 }
 
 /* ── §9 TICK ── */
-let lastDay=dayKey(new Date()),lastTs=Date.now();
+let lastDay=dayKey(new Date()),lastTs=Date.now(),lastMinute=-1;
 function tick(){
   const now=new Date();
   /* a >90s gap between ticks means the laptop slept — resync from wall clock */
   const jumped=Date.now()-lastTs>90000;lastTs=Date.now();
   setTxt($('c-clock'),`${P(now.getHours())}:${P(now.getMinutes())}:${P(now.getSeconds())}`);
   setTxt($('c-greg'),`${now.getDate()} ${EN_M[now.getMonth()]} ${now.getFullYear()}`);
-  const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
-  const h=(apiHijri&&apiHijri.gDate===dd)
-    ?{d:apiHijri.day,m:apiHijri.monthAr,y:apiHijri.year}
-    :(()=>{const x=toHijri(now.getFullYear(),now.getMonth(),now.getDate());return{d:x.day,m:HIJRI_M[x.month-1],y:x.year}})();
+  const h=hijriFor(now);
   setTxt($('c-hij'),`${h.d} ${h.m} ${h.y} هـ`);
   setTxt($('b-city'),getCity()[2]);
   renderPom();checkAdhan(now);
   if(pom.running&&pomRemain()<=0)pomFinish();
   if(now.getSeconds()%5===0)updNow();
-  if(now.getSeconds()===0)renderWeek();
+  /* Once per wall-clock MINUTE, detected by change rather than by seconds===0,
+     which a throttled background tab can step straight over. The spine is
+     redrawn too: a prayer's pass/next state used to freeze at whatever it was
+     when the timings loaded, so a passed Dhuhr kept reading as "next". */
+  const mk=now.getHours()*60+now.getMinutes();
+  if(mk!==lastMinute){lastMinute=mk;renderWeek();renderSpine()}
   const k=dayKey(now);
   if(k!==lastDay||jumped){
     lastDay=k;loadPrayer(true);loadWeather(true);loadEvents();renderLife();renderSpine();
@@ -1030,8 +1117,13 @@ function buildPal(q){
     ['set intention',()=>askIntent()],['settings',()=>show('ov-set')],['keys',()=>show('ov-help')],
     ['connect google calendar',()=>gConnect()],
     ['refetch everything',()=>{loadPrayer(true);loadWeather(true);loadEvents();toast('refetching')}],
+    ['nearest city (location)',()=>nearestCity()],
     ['preview adhan pill',()=>{const{nxt}=activePrayer(),p=nxt||PRAYERS[0];adhanPill(p,prayer?prayer[p.key]:'--:--')}],
-    ['enable notifications',()=>Notification.requestPermission().then(p=>toast('notifications: '+p))],
+    ['preview adhan reminder',()=>{const{nxt,nxtM}=activePrayer(),p=nxt||PRAYERS[0];prePill(p,prayer?prayer[p.key]:'--:--',nxtM>0?nxtM:cfg.pre)}],
+    ['enable notifications',()=>{
+      if(typeof Notification==='undefined')return toast('notifications unsupported here');
+      Notification.requestPermission().then(p=>toast('notifications: '+p));
+    }],
     ['clear today’s sessions',()=>{const a=gGet('sessions',{});delete a[dayKey(new Date())];gSet('sessions',a);renderSpine();toast('cleared')}],
   ];
   cmds.forEach(([label,fn])=>{if(!n||norm(label).includes(n))out.push({k:'cmd',label,sub:'',fn})});
@@ -1051,6 +1143,19 @@ function openPal(){show('ov-pal');palSel=0;$('pal-in').value='';renderPal('');se
 $('pal-in').addEventListener('input',e=>{palSel=0;renderPal(e.target.value)});
 $('pal-list').addEventListener('click',e=>{const it=e.target.closest('.pi');if(it){const f=palItems[+it.dataset.i].fn;closeOv();f()}});
 function setCity(i){cfg.city=i;gSet('city',i);loadPrayer(true);loadWeather(true);toast('city → '+getCity()[2])}
+/* Nearest listed city to where the browser says you are. Flat-earth distance
+   with a cos(lat) correction — at Morocco's scale the error is far below the
+   spacing between cities, and prayer times barely move within that. */
+function nearestCity(){
+  if(!navigator.geolocation)return toast('location unavailable here');
+  toast('locating…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const la=pos.coords.latitude,lo=pos.coords.longitude,k=Math.cos(la*Math.PI/180);
+    let best=0,bd=Infinity;
+    CITIES.forEach((c,i)=>{const d=(c[4]-la)**2+((c[5]-lo)*k)**2;if(d<bd){bd=d;best=i}});
+    setCity(best);
+  },()=>toast('location refused or unavailable'),{timeout:10000,maximumAge:3600000});
+}
 function askIntent(){
   const v=prompt('What is this session for?',pom.label||'');
   if(v===null)return;
@@ -1060,12 +1165,24 @@ function askIntent(){
   el.classList.toggle('empty',!pom.label);
   lastTitle='';renderPom();saveLive();
 }
+/* A number field's value, clamped to its own min/max. `+v||old` used to be the
+   rule here, which silently refused 0 — fatal for "remind 0 min before" (off)
+   and a Hijri offset of 0. An empty or half-typed field keeps the old value. */
+function numOf(el,old){
+  const t=el.value.trim();
+  if(t===''||t==='-'||isNaN(+t))return old;
+  let v=Math.round(+t);
+  if(el.min!=='')v=Math.max(+el.min,v);
+  if(el.max!=='')v=Math.min(+el.max,v);
+  return v;
+}
 [['f-exp','expect','num'],['f-work','work','num'],['f-short','short','num'],
  ['f-long','long','num'],['f-cyc','cycle','num'],['f-goal','goal','num'],
+ ['f-pre','pre','num'],['f-hadj','hadj','num'],
  ['f-ics','icsPath','str'],['f-gid','gClientId','str']].forEach(([id,key,type])=>{
   const el=$(id);el.value=cfg[key];
   el.addEventListener('input',()=>{
-    cfg[key]=type==='num'?(+el.value||cfg[key]):el.value;
+    cfg[key]=type==='num'?numOf(el,cfg[key]):el.value;
     gSet(key,cfg[key]);renderLife();renderMortality();renderSpine();
     if(!pom.running&&['work','short','long'].includes(key))pomReset();
     if(key==='icsPath')loadEvents();
@@ -1124,7 +1241,15 @@ window.addEventListener('beforeunload',saveLive);
     pom.phase=live.phase;pom.done=live.done;pom.label=live.label||'';
     pom.startedMin=live.startedMin;pom.endsAt=live.endsAt;pom.running=true;
     if(pom.label){$('intent').textContent=pom.label;$('intent').classList.remove('empty')}
-  }else{pom.remain=cfg.work*60*1000;gSet('live',null)}
+  }else{
+    /* The session ran out while the page was closed. It still happened, so it
+       still goes on the spine — provided it ended today. */
+    if(live&&live.startedMin!=null&&dayKey(new Date(live.endsAt))===dayKey(new Date())){
+      const min={work:cfg.work,short:cfg.short,long:cfg.long}[live.phase];
+      if(min)pushSession({type:live.phase,min,startMin:live.startedMin,label:live.label||''});
+    }
+    pom.remain=cfg.work*60*1000;gSet('live',null);
+  }
   renderPom();renderLife();renderMortality();renderSpine();renderWeek();gStatus();gDot();
   loadPrayer(false);loadWeather(false);loadEvents();
   tick();setInterval(tick,1000);

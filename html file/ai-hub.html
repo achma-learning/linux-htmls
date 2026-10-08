@@ -3,8 +3,346 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
 <title>AI Hub</title>
-<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237c5cff'/%3E%3Cstop offset='1' stop-color='%234f8cff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='22' font-size='17' text-anchor='middle' fill='white' font-family='sans-serif'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
+<style>
+/* AI Hub — standalone, single-file edition.
+ *
+ * This is the same launcher as ai-hub/ (the Linux install), folded into one
+ * file so it works by double-click: no server, no fetch(), nothing next to it.
+ * The ai-hub/ folder keeps the i3 integration (bin/ai-hub opens each assistant
+ * as its own --app window that i3 can place on the AI workspace); this page
+ * simply opens a new tab.
+ *
+ * One viewport, no scrolling, on a laptop. Below 700px wide it becomes an
+ * ordinary scrolling list, because a phone cannot fit twelve cards on screen.
+ */
+
+:root {
+  --bg: #08090d;
+  --border: rgba(255, 255, 255, .09);
+  --text: #f5f7fa;
+  --muted: #858b9a;
+  --dim: #5b6170;
+  --accent: #7c5cff;
+  --card: rgba(255, 255, 255, .045);
+  --card-hi: rgba(255, 255, 255, .075);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;          /* the whole point: never scroll */
+}
+
+body {
+  font-family: Inter, "Noto Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(124, 92, 255, .13), transparent 32%),
+    radial-gradient(circle at 88% 92%, rgba(0, 180, 255, .08), transparent 30%),
+    var(--bg);
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- header ---- */
+
+.header {
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand { display: flex; align-items: center; gap: 11px; }
+
+.logo {
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7c5cff, #4f8cff);
+  box-shadow: 0 8px 24px rgba(124, 92, 255, .25);
+  font-weight: 900;
+}
+
+.brand-name { font-size: 19px; font-weight: 700; letter-spacing: -.4px; white-space: nowrap; }
+
+.search-wrap { position: relative; width: min(400px, 36vw); }
+
+.search {
+  width: 100%; height: 38px;
+  padding: 0 40px 0 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  color: #fff;
+  background: rgba(255, 255, 255, .045);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+
+.search:focus { border-color: rgba(124, 92, 255, .55); background: rgba(255, 255, 255, .07); }
+.search::placeholder { color: var(--dim); }
+.search::-webkit-search-cancel-button { display: none; }
+
+.search-icon { position: absolute; left: 13px; top: 9px; color: var(--muted); pointer-events: none; }
+
+.shortcut {
+  position: absolute; right: 9px; top: 8px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .07);
+  color: var(--muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+/* ---- toolbar ---- */
+
+.content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.toolbar {
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filters { display: flex; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+
+.filter {
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.filter:hover { color: #fff; background: rgba(255, 255, 255, .04); }
+.filter:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+
+.filter.active {
+  color: #fff;
+  background: rgba(124, 92, 255, .15);
+  border-color: rgba(124, 92, 255, .22);
+}
+
+.filter .n { margin-left: 5px; color: var(--dim); font-size: 10px; }
+.filter.active .n { color: #b9adff; }
+
+.hint { color: var(--dim); font-size: 11px; white-space: nowrap; }
+
+.hint kbd {
+  padding: 2px 6px;
+  margin: 0 1px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .04);
+  color: #aab0bd;
+  font-family: inherit;
+  font-size: 10px;
+}
+
+/* ---- grid ----
+   Rows and columns are set in JS from the number of visible cards, so the grid
+   always fills the viewport exactly and never scrolls. */
+
+.grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 11px;
+}
+
+.card {
+  position: relative;
+  min-width: 0; min-height: 0;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--card);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  transition: transform .13s, border-color .13s, background .13s, box-shadow .13s;
+}
+
+.card:hover { transform: translateY(-2px); background: var(--card-hi); border-color: rgba(255, 255, 255, .18); }
+
+.card.selected {
+  border-color: var(--brand);
+  background: var(--card-hi);
+  box-shadow: 0 0 0 1px var(--brand), 0 12px 32px rgba(0, 0, 0, .35);
+}
+
+.icon {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.card h3 { margin: 11px 0 3px; font-size: 14px; font-weight: 700; letter-spacing: -.2px; }
+
+.card .provider { color: var(--dim); font-size: 10.5px; margin-bottom: 5px; }
+
+.card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.open {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #aab0bd;
+  font-size: 10.5px;
+}
+
+.open .num {
+  color: var(--dim);
+  font-size: 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 4px;
+  padding: 0 5px;
+  margin-left: 6px;
+}
+
+.arrow {
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .06);
+  transition: background .13s;
+}
+
+.card:hover .arrow, .card.selected .arrow { background: var(--brand); color: #fff; }
+
+/* The star can be clicked without opening the card, and has a 28px hit area
+   instead of the 12px glyph. (A span, not a <button>: a button inside a link
+   is invalid HTML.) */
+.star {
+  position: absolute;
+  top: 7px; right: 7px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.star:hover { background: rgba(255, 255, 255, .06); color: #ffc857; }
+.card.fav .star { color: #ffc857; }
+
+/* ---- footer ---- */
+
+.footer {
+  height: 26px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.status { display: flex; align-items: center; gap: 6px; }
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #35d07f;
+  box-shadow: 0 0 8px #35d07f;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.empty kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+/* Short screens: give the cards less padding rather than a scrollbar. */
+@media (max-height: 720px) {
+  .app { padding: 14px 20px; }
+  .header { height: 46px; }
+  .toolbar { height: 36px; }
+  .grid { gap: 8px; }
+  .card { padding: 12px; border-radius: 13px; }
+  .card h3 { margin-top: 8px; font-size: 13px; }
+  .card p { font-size: 10px; }
+  .icon { width: 30px; height: 30px; font-size: 14px; }
+}
+
+/* Narrow screens (phone, half-width tiling window): the one-viewport rule
+   cannot hold, so the page scrolls and the grid sizes itself. */
+@media (max-width: 700px) {
+  html, body { overflow: auto; height: auto; }
+  .app { height: auto; min-height: 100vh; padding: 14px 16px; }
+  .header { height: auto; flex-wrap: wrap; }
+  .search-wrap { width: 100%; }
+  .shortcut, .hint, .open .num { display: none; }
+  .grid { flex: none; grid-auto-rows: minmax(132px, auto); }
+  .footer { height: auto; padding-top: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
 </head>
 <body>
 
@@ -12,23 +350,24 @@
 
   <header class="header">
     <div class="brand">
-      <div class="logo">✦</div>
+      <div class="logo" aria-hidden="true">✦</div>
       <div class="brand-name">AI Hub</div>
     </div>
 
     <div class="search-wrap">
-      <span class="search-icon">⌕</span>
-      <input id="search" class="search" type="text" placeholder="Search…" autocomplete="off" spellcheck="false">
-      <span class="shortcut">/</span>
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input id="search" class="search" type="search" placeholder="Search assistants…" aria-label="Search assistants" autocomplete="off" spellcheck="false">
+      <span class="shortcut" aria-hidden="true">/</span>
     </div>
   </header>
 
   <main class="content">
     <div class="toolbar">
-      <div class="filters" id="filters"></div>
+      <div class="filters" id="filters" role="toolbar" aria-label="Filter by category"></div>
       <div class="hint">
         <kbd>←</kbd><kbd>↓</kbd><kbd>↑</kbd><kbd>→</kbd> move
         <kbd>↵</kbd> open
+        <kbd>1</kbd>–<kbd>9</kbd> jump
         <kbd>f</kbd> favourite
         <kbd>/</kbd> search
       </div>
@@ -38,12 +377,347 @@
   </main>
 
   <footer class="footer">
-    <div class="status"><span class="dot"></span><span id="status">loading…</span></div>
+    <div class="status"><span class="dot"></span><span id="status">ready</span></div>
     <div id="count"></div>
   </footer>
 
 </div>
 
-<script src="app.js"></script>
+<script>
+"use strict";
+/* AI Hub — a keyboard-first launcher for AI assistants.
+ *
+ * Everything it knows is in SERVICES below. Adding an assistant means adding
+ * one object there; nothing else in this file lists them. (The Linux install
+ * keeps the same list in ai-hub/data/ai.json — the two are independent.)
+ *
+ * Two rules the layout obeys:
+ *   - the page never scrolls. The grid's rows and columns are computed from
+ *     how many cards are visible, so they always fill the viewport exactly.
+ *   - arrow keys read the REAL column count back out of the grid, rather than
+ *     assuming 4. Otherwise navigation silently breaks whenever the layout
+ *     changes.
+ */
+
+const SERVICES = [
+  { id: "chatgpt", name: "ChatGPT", provider: "OpenAI", url: "https://chatgpt.com/",
+    category: ["chat", "coding", "research", "creative"], color: "#10a37f", icon: "✳",
+    blurb: "General-purpose assistant for chat, code, writing and analysis.", favorite: true },
+  { id: "claude", name: "Claude", provider: "Anthropic", url: "https://claude.ai/new",
+    category: ["chat", "coding", "research", "creative"], color: "#d97757", icon: "C",
+    blurb: "Long-form reasoning, writing and code.", favorite: true },
+  { id: "gemini", name: "Gemini", provider: "Google", url: "https://gemini.google.com/",
+    category: ["chat", "research", "creative"], color: "#4285f4", icon: "✦",
+    blurb: "Multimodal assistant tied into Google's search and docs.", favorite: true },
+  { id: "deepseek", name: "DeepSeek", provider: "DeepSeek", url: "https://chat.deepseek.com/",
+    category: ["chat", "coding", "research"], color: "#4d78ff", icon: "D",
+    blurb: "Strong reasoning and coding, generous free tier.", favorite: true },
+  { id: "perplexity", name: "Perplexity", provider: "Perplexity", url: "https://www.perplexity.ai/",
+    category: ["research"], color: "#20b8cd", icon: "P",
+    blurb: "Answer engine — cites its sources, good first stop for facts.", favorite: true },
+  { id: "notebooklm", name: "NotebookLM", provider: "Google", url: "https://notebooklm.google.com/",
+    category: ["research"], color: "#5f6368", icon: "N",
+    blurb: "Answers only from the sources you upload — courses, PDFs, notes.", favorite: false },
+  { id: "grok", name: "Grok", provider: "xAI", url: "https://grok.com/",
+    category: ["chat", "research"], color: "#8a8f9c", icon: "𝕏",
+    blurb: "Conversational assistant with live web and X data.", favorite: false },
+  { id: "kimi", name: "Kimi", provider: "Moonshot AI", url: "https://www.kimi.com/",
+    category: ["chat", "research", "coding"], color: "#695cff", icon: "K",
+    blurb: "Very long context — good for whole documents and papers.", favorite: false },
+  { id: "mistral", name: "Le Chat", provider: "Mistral AI", url: "https://chat.mistral.ai/",
+    category: ["chat", "coding", "research"], color: "#ff7000", icon: "M",
+    blurb: "Fast European assistant, strong at code and French.", favorite: false },
+  { id: "qwen", name: "Qwen", provider: "Alibaba", url: "https://chat.qwen.ai/",
+    category: ["chat", "coding", "research"], color: "#6257ee", icon: "Q",
+    blurb: "Multilingual reasoning and code.", favorite: false },
+  { id: "aistudio", name: "AI Studio", provider: "Google", url: "https://aistudio.google.com/",
+    category: ["coding"], color: "#1a73e8", icon: "A",
+    blurb: "Try Gemini models directly, with system prompts and long files.", favorite: false },
+  { id: "copilot", name: "Copilot", provider: "Microsoft", url: "https://copilot.microsoft.com/",
+    category: ["chat", "coding", "creative"], color: "#36a5ff", icon: "◎",
+    blurb: "Microsoft's assistant, wired into Bing and Office.", favorite: false },
+  { id: "metaai", name: "Meta AI", provider: "Meta", url: "https://www.meta.ai/",
+    category: ["chat", "creative"], color: "#087cff", icon: "∞",
+    blurb: "Llama-based assistant with image generation.", favorite: false },
+  { id: "huggingchat", name: "HuggingChat", provider: "Hugging Face", url: "https://huggingface.co/chat/",
+    category: ["chat", "coding"], color: "#ff9d00", icon: "H",
+    blurb: "Open-weight models side by side, free and account-optional.", favorite: false },
+  { id: "poe", name: "Poe", provider: "Quora", url: "https://poe.com/",
+    category: ["chat", "coding", "research", "creative"], color: "#8b5cf6", icon: "P",
+    blurb: "One subscription, many models — useful for comparing answers.", favorite: false },
+];
+
+const FAV_KEY = "ai-hub.favorites";
+const FILTER_KEY = "ai-hub.filter";
+
+const grid = document.getElementById("grid");
+const search = document.getElementById("search");
+const filterBar = document.getElementById("filters");
+const statusEl = document.getElementById("status");
+const countEl = document.getElementById("count");
+const narrow = window.matchMedia("(max-width: 700px)");
+
+const services = SERVICES;
+let visible = [];
+let selected = 0;
+let favorites = loadFavorites();
+let filter = loadFilter();
+
+/* ---------- storage (localStorage, no backend) ----------
+   Every access is guarded: a private window or a file:// page with storage
+   blocked must still render, just without memory. */
+
+function store(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : JSON.parse(raw);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function keep(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* not worth breaking the page over */ }
+}
+
+function loadFavorites() {
+  const list = store(FAV_KEY, null);
+  return Array.isArray(list) ? new Set(list) : null;   // null → use the "favorite" flags above
+}
+
+function loadFilter() {
+  const f = store(FILTER_KEY, "all");
+  return categories().includes(f) ? f : "all";
+}
+
+function isFav(s) {
+  return favorites ? favorites.has(s.id) : !!s.favorite;
+}
+
+function toggleFav(s) {
+  if (!favorites) favorites = new Set(services.filter(x => x.favorite).map(x => x.id));
+  favorites.has(s.id) ? favorites.delete(s.id) : favorites.add(s.id);
+  keep(FAV_KEY, [...favorites]);
+  // Un-starring the last card of the Favourites view would otherwise leave the
+  // selection pointing past the end.
+  render();
+  flash(s.name + (isFav(s) ? " added to favourites" : " removed from favourites"));
+}
+
+/* ---------- helpers ---------- */
+
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Accent-insensitive, so "le chat" finds "Le Chat" and "etude" would find "étude".
+const fold = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+let flashT;
+function flash(msg) {
+  statusEl.textContent = msg;
+  clearTimeout(flashT);
+  flashT = setTimeout(() => { statusEl.textContent = "ready"; }, 1800);
+}
+
+function categories() {
+  return ["all", "favorites", ...new Set(SERVICES.flatMap(s => s.category))];
+}
+
+/* ---------- filters ---------- */
+
+function buildFilters() {
+  filterBar.innerHTML = "";
+  for (const c of categories()) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "filter";
+    b.dataset.filter = c;
+    const label = c === "all" ? "All" : c === "favorites" ? "★ Favourites" : c[0].toUpperCase() + c.slice(1);
+    b.innerHTML = esc(label) + '<span class="n"></span>';
+    b.addEventListener("click", () => setFilter(c));
+    filterBar.appendChild(b);
+  }
+}
+
+function setFilter(c) {
+  filter = c;
+  selected = 0;
+  keep(FILTER_KEY, c);
+  render();
+}
+
+function inFilter(s, f) {
+  if (f === "all") return true;
+  if (f === "favorites") return isFav(s);
+  return s.category.includes(f);
+}
+
+/* ---------- render ---------- */
+
+function matchesQuery(s) {
+  const q = fold(search.value.trim());
+  if (!q) return true;
+  const hay = fold([s.name, s.provider, s.id, s.blurb, ...s.category].join(" "));
+  // Every word must appear somewhere — "google research" finds Gemini and NotebookLM.
+  return q.split(/\s+/).every(w => hay.includes(w));
+}
+
+function layout(n) {
+  // Choose rows and columns so the grid fills the viewport exactly. Two things
+  // are traded off:
+  //   - card shape, aimed at a landscape-ish card (ratio ~1.6);
+  //   - holes: a 5x3 grid for 12 cards leaves three empty cells in the last
+  //     row and looks unfinished, while 4x3 is flush. The penalty is what makes
+  //     12 items land on 4x3 instead of 5x3.
+  if (n === 0) return [1, 1];
+  if (narrow.matches) return [window.innerWidth < 420 ? 1 : 2, 0];   // 0 rows = let it flow
+  const w = grid.clientWidth || 1200;
+  const h = grid.clientHeight || 600;
+  let best = [Math.min(4, n), Math.ceil(n / Math.min(4, n))];
+  let bestScore = Infinity;
+  for (let cols = 1; cols <= Math.min(6, n); cols++) {
+    const rows = Math.ceil(n / cols);
+    const ratio = (w / cols) / (h / rows);
+    const shape = Math.abs(Math.log(ratio / 1.6));
+    const holes = (cols * rows - n) / n;
+    const score = shape + 1.6 * holes;
+    if (score < bestScore) { bestScore = score; best = [cols, rows]; }
+  }
+  return best;
+}
+
+function render() {
+  const q = search.value.trim();
+  for (const b of filterBar.children) {
+    b.classList.toggle("active", b.dataset.filter === filter);
+    b.setAttribute("aria-pressed", b.dataset.filter === filter);
+    // The count beside each filter respects the search, so you can see where
+    // the matches are before switching.
+    const n = services.filter(s => inFilter(s, b.dataset.filter) && matchesQuery(s)).length;
+    b.querySelector(".n").textContent = n;
+  }
+
+  visible = services.filter(s => inFilter(s, filter) && matchesQuery(s));
+  const [cols, rows] = layout(visible.length);
+  grid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  grid.style.gridTemplateRows = rows ? `repeat(${rows}, minmax(0, 1fr))` : "";
+
+  grid.innerHTML = "";
+  if (!visible.length) {
+    grid.innerHTML = filter === "favorites" && !q
+      ? '<div class="empty">No favourites yet.<br>Select a card and press <kbd>f</kbd>, or click its ☆.</div>'
+      : '<div class="empty">Nothing matches “' + esc(q) + '”.<br><kbd>Esc</kbd> clears the search.</div>';
+    countEl.textContent = "0 of " + services.length;
+    return;
+  }
+
+  visible.forEach((s, i) => {
+    const a = document.createElement("a");
+    a.className = "card" + (isFav(s) ? " fav" : "");
+    a.href = s.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.style.setProperty("--brand", s.color);
+    a.setAttribute("aria-label", `${s.name} by ${s.provider}`);
+    a.innerHTML =
+      `<div class="icon" aria-hidden="true">${esc(s.icon)}</div>` +
+      `<span class="star" role="button" aria-label="${isFav(s) ? "Remove from" : "Add to"} favourites">${isFav(s) ? "★" : "☆"}</span>` +
+      `<h3>${esc(s.name)}</h3>` +
+      `<div class="provider">${esc(s.provider)}</div>` +
+      `<p>${esc(s.blurb)}</p>` +
+      `<div class="open"><span>Open${i < 9 ? `<span class="num">${i + 1}</span>` : ""}</span><span class="arrow">↗</span></div>`;
+    a.addEventListener("mouseenter", () => select(i));
+    a.addEventListener("focus", () => select(i));
+    a.querySelector(".star").addEventListener("click", ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      toggleFav(s);
+    });
+    grid.appendChild(a);
+  });
+
+  select(Math.min(selected, visible.length - 1));
+  countEl.textContent = visible.length === services.length
+    ? services.length + " assistants"
+    : visible.length + " of " + services.length;
+}
+
+function select(i, reveal) {
+  if (!visible.length) return;
+  selected = Math.max(0, Math.min(i, visible.length - 1));
+  [...grid.children].forEach((c, n) => c.classList.toggle("selected", n === selected));
+  // Only the keyboard scrolls; scrolling under a hovering mouse would chase it.
+  if (reveal && narrow.matches) grid.children[selected].scrollIntoView({ block: "nearest" });
+}
+
+function launch(i) {
+  if (!visible[i]) return;
+  select(i);
+  window.open(visible[i].url, "_blank", "noopener,noreferrer");
+  flash("opened " + visible[i].name);
+}
+
+function columns() {
+  // Read the real column count back out of the grid instead of assuming one.
+  return parseInt(grid.style.gridTemplateColumns.split("repeat(")[1], 10) || 1;
+}
+
+/* ---------- keyboard ---------- */
+
+search.addEventListener("input", () => { selected = 0; render(); });
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;   // leave browser shortcuts alone
+  const typing = document.activeElement === search;
+
+  if (e.key === "/" && !typing) { e.preventDefault(); search.focus(); search.select(); return; }
+
+  if (e.key === "Escape") {
+    if (search.value) { search.value = ""; selected = 0; render(); }
+    else if (filter !== "all") setFilter("all");
+    search.blur();
+    return;
+  }
+
+  if (e.key === "Enter") {
+    // A focused filter button should keep its own Enter.
+    if (!typing && document.activeElement && document.activeElement.tagName === "BUTTON") return;
+    e.preventDefault();
+    launch(selected);
+    return;
+  }
+
+  // While typing, only the arrows are borrowed — every other key belongs to the
+  // search box.
+  const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+  if (typing && !arrows.includes(e.key)) return;
+
+  if (!typing && /^[1-9]$/.test(e.key)) {
+    e.preventDefault();
+    launch(+e.key - 1);
+    return;
+  }
+
+  if (!typing && (e.key === "f" || e.key === "F")) {
+    e.preventDefault();
+    if (visible.length) toggleFav(visible[selected]);
+    return;
+  }
+
+  if (!arrows.includes(e.key)) return;
+  // Left/right inside a non-empty search box move the caret, as they should.
+  if (typing && search.value && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return;
+  e.preventDefault();
+
+  const cols = columns();
+  const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
+  select(selected + delta, true);
+});
+
+let resizeT;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(render, 80); });
+
+buildFilters();
+render();
+</script>
 </body>
 </html>
