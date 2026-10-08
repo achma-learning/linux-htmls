@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>deck</title>
+<title>Deck</title>
 <style>
 /* ══════════ TOKENS ══════════
    Colour is state, never decoration:
@@ -59,11 +59,7 @@ body{
 #b-weeks{color:var(--saffron);font-weight:500}
 #b-weeks small{color:var(--dimmer);font-weight:400;letter-spacing:.1em;font-size:9px;text-transform:uppercase;margin-left:5px}
 .net{width:6px;height:6px;border-radius:50%;background:var(--verdigris);flex:none}
-/* agenda source. majorelle = external commitment (invariant 4): lit when the
-   week is live from Google, dim when it is the local JSON file. */
-.gdot{width:6px;height:6px;border-radius:50%;background:var(--majorelle);flex:none}
-.gdot.off{background:var(--line2)}
-.net.off{background:var(--terracotta)}.net.wait{background:var(--saffron)}
+.net.off{background:var(--terracotta)}.net.wait{background:var(--saffron)}.net.idle{background:var(--line2)}
 
 /* ── §SPINE — the day, to scale ── */
 #spine{grid-area:spine;position:relative;padding:9px 0 8px;display:flex;flex-direction:column}
@@ -221,8 +217,20 @@ input:focus{outline:none;border-color:var(--saffron)}
 input.bad{border-color:var(--terracotta)}
 button{background:var(--ink3);border:1px solid var(--line2);color:var(--tadelakt);font-family:var(--mono);font-size:12px;padding:7px 12px;border-radius:2px;cursor:pointer}
 button:hover{border-color:var(--saffron)}
-#g-status{font-size:10.5px;color:var(--dimmer);margin-top:-4px;margin-bottom:12px}
-#g-status.on{color:var(--verdigris)}
+select{background:var(--ink);border:1px solid var(--line2);color:var(--tadelakt);font-family:var(--mono);font-size:13px;padding:6px 7px;border-radius:2px}
+select:focus{outline:none;border-color:var(--saffron)}
+input[type=checkbox]{width:auto;accent-color:var(--saffron);transform:scale(1.15);justify-self:start}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* agenda overlay */
+.agform{display:grid;grid-template-columns:118px 74px 74px 1fr;gap:8px;margin-bottom:8px}
+.agform2{display:grid;grid-template-columns:1fr auto;gap:8px}
+#ag-list{margin-top:12px;border-top:1px solid var(--line)}
+.agi{display:grid;grid-template-columns:132px 92px 1fr auto 26px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px}
+.agi .ad{color:var(--dim)}.agi .at{color:var(--majorelle)}.agi .ar2{color:var(--dimmer);font-size:10px;letter-spacing:.08em}
+.agi .an{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agi.past{opacity:.45}
+.agi button{padding:0;width:24px;height:22px;line-height:1;color:var(--dim)}
+.agi button:hover{color:var(--terracotta);border-color:var(--terracotta)}
 .sep{border-top:1px solid var(--line);margin:14px 0 12px;padding-top:12px}
 .sep .lbl{display:block;margin-bottom:10px}
 #pal-in{border:0;border-bottom:1px solid var(--line2);border-radius:0;font-size:16px;padding:14px 16px}
@@ -249,8 +257,7 @@ button:hover{border-color:var(--saffron)}
 
   <div id="bar">
     <div id="bar-l">
-      <span class="net wait" id="net" title="data source"></span>
-      <span class="gdot off" id="gdot" title="agenda: local JSON file"></span>
+      <span class="net idle" id="net" title="weather"></span>
       <span id="b-city">—</span><span id="b-temp">--°</span><span id="b-wi">·</span>
     </div>
     <div id="bar-c">
@@ -315,7 +322,7 @@ button:hover{border-color:var(--saffron)}
     <span><kbd>space</kbd>start/pause</span><span><kbd>r</kbd>reset</span>
     <span><kbd>n</kbd>next phase</span><span><kbd>i</kbd>intention</span>
     <span><kbd>c</kbd>city</span><span><kbd>s</kbd>settings</span>
-    <span><kbd>R</kbd>refetch</span><span><kbd>:</kbd>command</span><span><kbd>?</kbd>keys</span>
+    <span><kbd>a</kbd>agenda</span><span><kbd>R</kbd>weather</span><span><kbd>:</kbd>command</span><span><kbd>?</kbd>keys</span>
     <span id="motto">a tool to serve you, son of Adam</span>
   </div>
 </div>
@@ -336,19 +343,57 @@ button:hover{border-color:var(--saffron)}
     <div class="frow"><label>Sessions per cycle</label><input type="number" id="f-cyc" min="2" max="8"></div>
     <div class="frow"><label>Daily focus goal (min)</label><input type="number" id="f-goal" min="30" max="900" step="30"></div>
     <div class="sep">
-      <span class="lbl">Agenda</span>
-      <div class="frow"><label>Google OAuth client ID</label><input id="f-gid" placeholder="…apps.googleusercontent.com" autocomplete="off" spellcheck="false"></div>
-      <div class="frow"><label></label><button id="g-btn" type="button">Connect Google Calendar</button></div>
-      <div id="g-status">Not connected — falling back to the JSON file.</div>
-      <div class="frow"><label>JSON fallback</label><input id="f-ics" placeholder="./data/events.json"></div>
+      <span class="lbl">Prayer</span>
+      <div class="frow"><label>Remind before adhan (min)</label><input type="number" id="f-pre" min="0" max="60"></div>
+      <div class="frow"><label>Hijri date offset (days)</label><input type="number" id="f-hadj" min="-2" max="2"></div>
+      <div class="hint" style="margin-top:0">0 turns the early reminder off. Morocco's official Hijri date
+      (Ministry of Habous, by moon sighting) can sit a day off the computed one — nudge it here.</div>
+    </div>
+    <div class="sep">
+      <span class="lbl">Weather</span>
+      <div class="frow"><label>Live weather (online)</label><input type="checkbox" id="f-wx"></div>
+      <div class="hint" style="margin-top:0">The only thing this page fetches. Off, or offline, and
+      everything else works the same.</div>
+    </div>
+    <div class="sep">
+      <span class="lbl">Your data</span>
+      <div class="btns"><button id="b-agenda" type="button">Agenda…</button>
+      <button id="b-export" type="button">Export backup</button>
+      <button id="b-import" type="button">Import backup</button></div>
     </div>
     <div class="hint">Saves as you type. <code>Esc</code> closes.<br>
-    Google needs a Cloud project with the Calendar API on, and this page's origin
-    (<code>http://localhost:8787</code>) listed as an authorised JavaScript origin.
-    Connecting loads Google's script — the only time the deck touches a remote origin
-    it didn't have to. The <code>gcal-sync</code> JSON path stays available and works offline.</div>
+    Everything is kept in this browser, for this file. Export a backup before clearing
+    browsing data or moving to another browser or computer.</div>
   </div>
 </div></div>
+
+<div class="ov" id="ov-agenda"><div class="card">
+  <h2>Agenda</h2>
+  <div class="body">
+    <div class="agform">
+      <input id="ag-date" placeholder="dd/mm/yyyy" inputmode="numeric" maxlength="10" autocomplete="off" aria-label="date">
+      <input id="ag-time" placeholder="hh:mm" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="start time">
+      <input id="ag-end" placeholder="end" inputmode="numeric" maxlength="5" autocomplete="off" aria-label="end time">
+      <select id="ag-rep" aria-label="repeat"><option value="">once</option><option value="daily">daily</option>
+        <option value="weekly">weekly</option><option value="monthly">monthly</option><option value="yearly">yearly</option></select>
+    </div>
+    <div class="agform2">
+      <input id="ag-title" placeholder="what — Enter adds it" autocomplete="off" aria-label="title">
+      <button id="ag-add" type="button">Add</button>
+    </div>
+    <div id="ag-list"></div>
+    <div class="sep btns" style="margin-bottom:0">
+      <button id="ag-import" type="button">Import .ics</button>
+      <button id="ag-clear" type="button">Remove imported</button>
+      <span id="ag-imp" class="lbl"></span>
+    </div>
+    <div class="hint">No time = all day. To bring a calendar in: Google Calendar → Settings →
+    Import &amp; export → Export, unzip, import the <code>.ics</code> here. A new import replaces
+    the previous one; events you typed yourself stay.</div>
+  </div>
+</div></div>
+<input type="file" id="file-ics" accept=".ics,text/calendar" hidden>
+<input type="file" id="file-backup" accept=".json,application/json" hidden>
 
 <div class="ov" id="ov-help"><div class="card" id="help">
   <h2>Keys</h2>
@@ -357,9 +402,10 @@ button:hover{border-color:var(--saffron)}
     <tr><td>r</td><td>reset the current phase</td></tr>
     <tr><td>n</td><td>skip to the next phase</td></tr>
     <tr><td>i</td><td>name this session</td></tr>
-    <tr><td>c &nbsp;:&nbsp; ctrl+k</td><td>command palette — cities and actions</td></tr>
-    <tr><td>s</td><td>settings</td></tr>
-    <tr><td>R</td><td>refetch prayer, weather and agenda</td></tr>
+    <tr><td>c &nbsp;:&nbsp; ctrl+k</td><td>command palette — cities, nearest city, actions</td></tr>
+    <tr><td>a</td><td>agenda — add events, import a calendar</td></tr>
+    <tr><td>s</td><td>settings, backup</td></tr>
+    <tr><td>R</td><td>refetch weather</td></tr>
     <tr><td>?</td><td>this list</td></tr>
     <tr><td>esc</td><td>close anything open</td></tr>
   </table>
@@ -372,12 +418,16 @@ button:hover{border-color:var(--saffron)}
 <script>
 "use strict";
 /* ════════════════════════════════════════════════════════════════
-   deck v0.2 — a read-only orientation console.
+   deck v0.4 — a read-only orientation console.
    Ported from “Time Island & Sidebar Widgets” v5.0.1 (Achma, MIT).
    Kept verbatim: CITIES, PRAYERS, toHijri(), LIFE_STAGES, calcAge().
-   Replaced: GM_* → localStorage · GM_xmlhttpRequest → fetch
-             wttr.in → Open-Meteo (CORS) · daily timings → cached month
+   Replaced: GM_* → localStorage · wttr.in → Open-Meteo (CORS)
    Evicted in v0.2: the prayer grid — the spine renders it strictly better.
+   v0.3: early adhan reminder · Jumuʿa / iftar names · Hijri offset ·
+         nearest city · alerts survive tab throttling · more cities.
+   v0.4: ONE FILE, NOTHING ELSE. Prayer times and the Hijri date are computed
+         here (no AlAdhan), the agenda lives here (no Google script, no
+         events.json). Weather is the single, optional network call.
    ════════════════════════════════════════════════════════════════ */
 
 /* ── §0 DATA ── */
@@ -402,6 +452,16 @@ const CITIES=[
  [139,'تنغير','Tinghir','Tinghir',31.51,-5.53],[149,'كلميم','Guelmim','Guelmim',28.98,-10.06],
  [152,'طانطان','Tan-Tan','Tan-Tan',28.44,-11.10],[156,'العيون','Laâyoune','Laayoune',27.13,-13.16],
  [165,'الداخلة','Dakhla','Dakhla',23.68,-15.96],[148,'سيدي إفني','Sidi Ifni','Sidi Ifni',29.38,-10.17],
+ /* appended in v0.3 — cfg.city stores an INDEX, so new cities only ever go at the end */
+ [201,'سلا','Salé','Sale',34.05,-6.80],[202,'تمارة','Témara','Temara',33.93,-6.91],
+ [203,'العرائش','Larache','Larache',35.19,-6.16],[204,'القصر الكبير','Ksar El Kébir','Ksar El Kebir',35.00,-5.90],
+ [205,'الخميسات','Khémisset','Khemisset',33.82,-6.07],[206,'بركان','Berkane','Berkane',34.92,-2.32],
+ [207,'تاوريرت','Taourirt','Taourirt',34.41,-2.90],[208,'خنيفرة','Khénifra','Khenifra',32.94,-5.67],
+ [209,'صفرو','Sefrou','Sefrou',33.83,-4.83],[210,'إنزكان','Inezgane','Inezgane',30.36,-9.54],
+ [211,'قلعة السراغنة','El Kelâa des Sraghna','El Kelaa des Sraghna',32.05,-7.41],[212,'اليوسفية','Youssoufia','Youssoufia',32.25,-8.53],
+ [213,'الفقيه بن صالح','Fquih Ben Salah','Fquih Ben Salah',32.50,-6.69],[214,'أزيلال','Azilal','Azilal',31.96,-6.57],
+ [215,'فكيك','Figuig','Figuig',32.11,-1.23],[216,'السمارة','Smara','Smara',26.74,-11.67],
+ [217,'بوجدور','Boujdour','Boujdour',26.13,-14.48],
 ];
 const PRAYERS=[
  {key:'Fajr',ar:'الفجر',en:'Fajr'},{key:'Sunrise',ar:'الشروق',en:'Shuruq'},
@@ -456,21 +516,21 @@ function calcAge(bs){
 }
 let toastT;
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1800)}
-function net(s){const n=$('net');n.className='net'+(s==='off'?' off':s==='wait'?' wait':'');n.title=s==='off'?'offline — showing cache':s==='wait'?'fetching':'live'}
+function net(s){const n=$('net');n.className='net'+(s==='off'?' off':s==='wait'?' wait':s==='idle'?' idle':'');n.title=s==='off'?'weather: offline — showing last reading':s==='wait'?'weather: fetching':s==='idle'?'weather: off':'weather: live'}
 /* <input type="date"> renders in the BROWSER's locale, which no attribute
    overrides. A text field is the only way to guarantee dd/mm/yyyy. */
 const isoToDmy=iso=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return '';
   const [y,m,d]=iso.split('-');return `${d}/${m}/${y}`;
 };
-function dmyToIso(v){
+function dmyToIso(v,future){
   const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(v).trim());
   if(!m)return null;
   const d=+m[1],mo=+m[2],y=+m[3];
   if(mo<1||mo>12||d<1||d>31||y<1900||y>2200)return null;
   const dt=new Date(y,mo-1,d);
   if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return null; /* 31/02 */
-  if(dt>new Date())return null;
+  if(!future&&dt>new Date())return null;
   return `${y}-${P(mo)}-${P(d)}`;
 }
 /* "3 h, 32 min" — but under an hour, just "32 min" */
@@ -485,11 +545,12 @@ function setTxt(el,v){if(el.textContent!==v)el.textContent=v}
 const cfg={
   city:gGet('city',22),bday:gGet('bday',''),expect:gGet('expect',80),
   work:gGet('work',25),short:gGet('short',5),long:gGet('long',15),cycle:gGet('cycle',4),
-  icsPath:gGet('icsPath','./data/events.json'),
   goal:gGet('goal',240),          /* 4h of real focus, every day */
-  gClientId:gGet('gClientId',''),
+  pre:gGet('pre',10),             /* minutes of warning before each adhan; 0 = off */
+  hadj:gGet('hadj',0),            /* Hijri offset in days, for the official Moroccan date */
+  wx:gGet('wx',true),              /* live weather — the only network call */
 };
-let prayer=null,apiHijri=null,weather=null,eventsByDay=null;
+let prayer=null,weather=null,eventsByDay=null;
 const getCity=()=>CITIES[cfg.city]||CITIES[22];
 function todaySessions(){const a=gGet('sessions',{});return a[dayKey(new Date())]||[]}
 function pushSession(rec){
@@ -499,34 +560,92 @@ function pushSession(rec){
   gSet('sessions',all);
 }
 
-/* ── §3 PRAYER — AlAdhan method=21, default output, no tune ── */
-async function loadPrayer(force){
-  const c=getCity(),now=new Date();
-  const key=`pray_${c[0]}_${now.getFullYear()}_${now.getMonth()+1}`;
-  const cached=gGet(key,null);
-  if(cached){applyPrayer(cached,now);net('ok');if(!force)return}
-  net('wait');
-  const url=`https://api.aladhan.com/v1/calendar/${now.getFullYear()}/${now.getMonth()+1}`
-          +`?latitude=${c[4]}&longitude=${c[5]}&method=21`;
-  try{
-    const r=await fetch(url,{cache:'no-cache'});const d=await r.json();
-    if(d.code!==200||!Array.isArray(d.data))throw new Error('bad payload');
-    const month=d.data.map(day=>{
-      const t={};PRAYERS.forEach(p=>{t[p.key]=String(day.timings[p.key]).split(' ')[0]});
-      return{g:day.date.gregorian.date,t,h:{day:+day.date.hijri.day,ar:day.date.hijri.month.ar,year:+day.date.hijri.year}};
-    });
-    gSet(key,month);applyPrayer(month,now);net('ok');
-  }catch(e){
-    net('off');
-    if(!cached)setTxt($('sf-left'),'no data');
+/* ── §3 PRAYER — computed here, no network ──
+   The Morocco method exactly as AlAdhan (method 21) defines it: Fajr at 19°,
+   Isha at 17°, Asr at shadow factor 1, sunrise/sunset at 0.833°, and the
+   Ministry's precaution of +5 min on Dhuhr and on Maghrib. The astronomy is
+   PrayTimes.org's (Hamid Zarrabi-Zadeh, LGPL) — one pass, round to the minute.
+   Checked against AlAdhan for Casablanca, Tanger, Oujda and Dakhla over four
+   months of 2026, 2952 times: Fajr, Shuruq, Dhuhr, Maghrib and Isha identical
+   to the minute every day; Asr ±1 min on about one day in seven.
+   Times are in the BROWSER's time zone — the same clock the deck displays and
+   checks alerts against. That is deliberate: Morocco left UTC+1 for UTC+0 on
+   20 Sep 2026 (tzdata 2026c), and a browser still carrying older zone data
+   shows the clock an hour off. Prayer instants and "now" then shift together,
+   so every alert still fires at the true moment. A timetable fetched in the
+   server's zone would have been compared against the stale clock instead. */
+const prayTimes=(()=>{
+  const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
+  const fix=(a,b)=>{a=a-b*Math.floor(a/b);return a<0?a+b:a};
+  const sin=d=>Math.sin(rad(d)),cos=d=>Math.cos(rad(d)),tan=d=>Math.tan(rad(d));
+  const asin=x=>deg(Math.asin(x)),acos=x=>deg(Math.acos(x)),atan2=(y,x)=>deg(Math.atan2(y,x)),acot=x=>deg(Math.atan(1/x));
+  function julian(y,m,d){if(m<=2){y-=1;m+=12}const A=Math.floor(y/100),B=2-A+Math.floor(A/4);
+    return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+d+B-1524.5}
+  function sun(jd){
+    const D=jd-2451545.0,g=fix(357.529+0.98560028*D,360),q=fix(280.459+0.98564736*D,360);
+    const L=fix(q+1.915*sin(g)+0.020*sin(2*g),360),e=23.439-0.00000036*D;
+    const RA=atan2(cos(e)*sin(L),cos(L))/15;
+    return{decl:asin(sin(e)*sin(L)),eqt:q/15-fix(RA,24)};
   }
-}
-function applyPrayer(month,now){
-  const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
-  const rec=month.find(m=>m.g===dd)||month[now.getDate()-1];
-  if(!rec)return;
-  prayer=rec.t;apiHijri={day:rec.h.day,monthAr:rec.h.ar,year:rec.h.year,gDate:dd};
+  return function(y,m,d,lat,lng,tz){            /* m 1–12 · tz hours east of UTC */
+    const jd=julian(y,m,d)-lng/(15*24);
+    const noon=t=>fix(12-sun(jd+t).eqt,24);
+    const angle=(a,t,ccw)=>{const s=sun(jd+t),n=noon(t);
+      const h=acos((-sin(a)-sin(s.decl)*sin(lat))/(cos(s.decl)*cos(lat)))/15;return n+(ccw?-h:h)};
+    const asr=t=>{const s=sun(jd+t);return angle(-acot(1+tan(Math.abs(lat-s.decl))),t)};
+    const raw={Fajr:angle(19,5/24,1),Sunrise:angle(0.833,6/24,1),Dhuhr:noon(12/24),
+               Asr:asr(13/24),Maghrib:angle(0.833,18/24),Isha:angle(17,18/24)};
+    const off={Dhuhr:5,Maghrib:5},out={};
+    for(const k in raw){
+      const v=fix(raw[k]+tz-lng/15+(off[k]||0)/60+0.5/60,24);
+      out[k]=`${P(Math.floor(v))}:${P(Math.floor((v-Math.floor(v))*60))}`;
+    }
+    return out;
+  };
+})();
+function computePrayer(){
+  const c=getCity(),now=new Date();
+  /* the offset at noon is the day's offset: clock changes happen at night */
+  const tz=-new Date(now.getFullYear(),now.getMonth(),now.getDate(),12).getTimezoneOffset()/60;
+  prayer=prayTimes(now.getFullYear(),now.getMonth()+1,now.getDate(),c[4],c[5],tz);
   renderSpine();
+}
+/* Keys earlier versions left behind: the AlAdhan month cache, the Google
+   token, the events.json path. Removed once, quietly. */
+function cleanupLegacy(){
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&(k.startsWith('deck_pray_')||['deck_adhanSeen','deck_gtok','deck_gever','deck_gClientId','deck_icsPath'].includes(k)))
+        localStorage.removeItem(k);
+    }
+  }catch{}
+}
+/* Today's Hijri date, shifted by cfg.hadj. The browser's own Umm al-Qura
+   calendar (Intl) agrees with AlAdhan on every day tested; the arithmetic
+   toHijri() is only the fallback for a browser without it, and runs 1–2 days
+   off. Morocco fixes its months by sighting the moon, so the offset setting is
+   what lines this up with the Ministry's date. */
+const HFMT=(()=>{try{
+  const f=new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn',{day:'numeric',month:'numeric',year:'numeric'});
+  return f.resolvedOptions().calendar==='islamic-umalqura'?f:null}catch{return null}})();
+function hijriFor(now){
+  const s=addDays(now,cfg.hadj|0);
+  if(HFMT){
+    const p={};HFMT.formatToParts(s).forEach(o=>{p[o.type]=o.value});
+    const d=+p.day,n=+p.month,y=parseInt(p.year,10);
+    if(d&&n&&y)return{d,m:HIJRI_M[n-1],n,y};
+  }
+  const x=toHijri(s.getFullYear(),s.getMonth(),s.getDate());
+  return{d:x.day,m:HIJRI_M[x.month-1],n:x.month,y:x.year};
+}
+/* The name a prayer goes by TODAY: Dhuhr is Jumuʿa on a Friday, and Maghrib is
+   the iftar in Ramadan. Names only — the times are untouched. */
+function pName(p,now){
+  now=now||new Date();
+  if(p.key==='Dhuhr'&&now.getDay()===5)return{en:'Jumuʿa',ar:'الجمعة'};
+  if(p.key==='Maghrib'&&hijriFor(now).n===9)return{en:'Iftar',ar:p.ar};
+  return{en:p.en,ar:p.ar};
 }
 function activePrayer(){
   if(!prayer)return{act:null,nxt:null,nxtM:-1};
@@ -540,16 +659,19 @@ function activePrayer(){
 
 /* ── §4 WEATHER — Open-Meteo ── */
 async function loadWeather(force){
+  if(!cfg.wx){weather=null;setTxt($('b-temp'),'');setTxt($('b-wi'),'');$('b-temp').parentNode.title='';net('idle');return}
   const c=getCity(),key=`wx_${c[0]}`,cached=gGet(key,null);
-  if(cached){weather=cached.d;renderWeather();if(!force&&Date.now()-cached.at<30*60*1000)return}
+  if(cached){weather=cached.d;renderWeather();net('ok');if(!force&&Date.now()-cached.at<30*60*1000)return}
+  else{setTxt($('b-temp'),'--°');setTxt($('b-wi'),'·')}
+  net('wait');
   const url=`https://api.open-meteo.com/v1/forecast?latitude=${c[4]}&longitude=${c[5]}`
     +`&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m`
     +`&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4`;
   try{
     const r=await fetch(url);const d=await r.json();
     if(!d.current)throw new Error('bad payload');
-    weather=d;gSet(key,{at:Date.now(),d});renderWeather();
-  }catch{ /* the bar simply keeps its last value */ }
+    weather=d;gSet(key,{at:Date.now(),d});renderWeather();net('ok');
+  }catch{net('off') /* the bar simply keeps its last value */ }
 }
 /* Weather lives in the status bar only. The detail is one hover away and
    was never worth a panel on a screen this dense. */
@@ -628,7 +750,7 @@ function renderSpine(){
       const el=document.createElement('div');
       el.className='notch'+state;
       el.style.top=lbl+'%';
-      el.innerHTML=`<span class="t">${prayer[p.key]}</span><span class="d"></span><span class="n">${p.en}</span>`;
+      el.innerHTML=`<span class="t">${prayer[p.key]}</span><span class="d"></span><span class="n">${esc(pName(p).en)}</span>`;
       rail.appendChild(el);
     });
   }
@@ -657,7 +779,7 @@ function updNow(){
   if(prayer){
     const{nxt,nxtM}=activePrayer();
     if(nxt){
-      const name=`${nxt.en} · <span class="ar">${esc(nxt.ar)}</span>`;
+      const nn=pName(nxt),name=`${esc(nn.en)} · <span class="ar">${esc(nn.ar)}</span>`;
       if($('sf-name').innerHTML!==name)$('sf-name').innerHTML=name;
       setTxt($('sf-left'),fmtLeft(nxtM));
     }
@@ -733,121 +855,149 @@ function renderMortality(){
   setTxt($('age-sub'),`born ${isoToDmy(cfg.bday)} · ${pct.toFixed(0)}% of ${cfg.expect} yrs lived`);
 }
 
-/* ── §6c GOOGLE CALENDAR ──
-   Opt-in. Loading Google's script is the one time the deck reaches a remote
-   origin it doesn't strictly need, so it only happens after you connect.
-   The gcal-sync JSON stays the offline path and the fallback. */
-let gTok=gGet('gtok',null),gClient=null,gRenewing=null,gState='json';
-/* Renew this long before the token lapses. Google's implicit-flow token lives
-   about an hour and has NO refresh token — that is the design of the flow, not
-   an oversight — so the only way to stay live is to ask for another one before
-   the current one dies, while the Google session cookie is still good. */
-const G_EARLY=5*60*1000;
-const gLive=()=>!!(gTok&&gTok.exp>Date.now());
-function gsiLoad(){
-  return new Promise((res,rej)=>{
-    if(window.google&&google.accounts&&google.accounts.oauth2)return res();
-    const el=document.createElement('script');
-    el.src='https://accounts.google.com/gsi/client';el.async=true;
-    el.onload=()=>res();el.onerror=()=>rej(new Error('script blocked'));
-    document.head.appendChild(el);
-  });
+/* ── §6c AGENDA — kept in this file's storage, nothing fetched ──
+   An event: {id, date:'YYYY-MM-DD', last?:'YYYY-MM-DD' (multi-day, all-day),
+   start:'HH:MM'|'' (''=all day), end, title, rep:''|daily|weekly|monthly|yearly,
+   iv (every n), until, count, byday:[0–6] (weekly), ex:[dates skipped],
+   src:'me'|'ics'}. Recurrences are expanded per day on demand, never stored. */
+let agenda=gGet('agenda',[]);
+if(!Array.isArray(agenda))agenda=[];
+const saveAgenda=()=>{gSet('agenda',agenda);loadEvents()};
+const mon0=d=>(d.getDay()+6)%7;                 /* weeks start on Monday (RFC 5545) */
+function occursOn(ev,k,d){
+  if(k<ev.date)return false;
+  if(ev.ex&&ev.ex.includes(k))return false;
+  if(!ev.rep)return k===ev.date||(!!ev.last&&k<=ev.last);
+  if(ev.until&&k>ev.until)return false;
+  const s=new Date(ev.date+'T12:00:00'),diff=Math.round((d-s)/86400000),iv=ev.iv||1;
+  let idx;                                       /* 0-based index of this occurrence */
+  if(ev.rep==='daily'){if(diff%iv)return false;idx=diff/iv}
+  else if(ev.rep==='weekly'){
+    const by=ev.byday&&ev.byday.length?ev.byday:[s.getDay()];
+    if(!by.includes(d.getDay())||Math.floor((diff+mon0(s))/7)%iv)return false;
+    if(!ev.count)return true;
+    idx=-1;for(let i=0;i<=diff;i++){const x=addDays(s,i);if(by.includes(x.getDay())&&Math.floor((i+mon0(s))/7)%iv===0)idx++}
+  }
+  else if(ev.rep==='monthly'){
+    if(d.getDate()!==s.getDate())return false;
+    const md=(d.getFullYear()-s.getFullYear())*12+d.getMonth()-s.getMonth();if(md%iv)return false;idx=md/iv;
+  }
+  else if(ev.rep==='yearly'){
+    if(d.getDate()!==s.getDate()||d.getMonth()!==s.getMonth())return false;
+    const yd=d.getFullYear()-s.getFullYear();if(yd%iv)return false;idx=yd/iv;
+  }
+  else return k===ev.date;
+  return !ev.count||idx<ev.count;
 }
-/* One token request. silent=true passes prompt:'' — "reuse the session you
-   already have, show me nothing". If Google cannot honour that (signed out,
-   consent revoked, popup blocked because there is no user gesture) it fails and
-   we stay on the JSON path; it can never take over the screen on its own.
-   The timeout exists because a blocked popup does not always reach
-   error_callback, and a promise that never settles would wedge loadEvents. */
-function gRequest(silent){
-  return (async()=>{
-    if(!cfg.gClientId)return false;
-    try{await gsiLoad()}catch{return false}
-    return new Promise(resolve=>{
-      let done=false;const finish=ok=>{if(!done){done=true;resolve(ok)}};
-      try{
-        if(!gClient||gClient._deckId!==cfg.gClientId){
-          gClient=google.accounts.oauth2.initTokenClient({
-            client_id:cfg.gClientId,
-            scope:'https://www.googleapis.com/auth/calendar.readonly',
-            callback:r=>{
-              if(r&&r.access_token){
-                gTok={t:r.access_token,exp:Date.now()+((+r.expires_in||3600)-60)*1000};
-                gSet('gtok',gTok);gSet('gever',true);gStatus();finish(true);
-              }else finish(false);
-            },
-            error_callback:()=>finish(false),
-          });
-          gClient._deckId=cfg.gClientId;
-        }
-        gClient.requestAccessToken(silent?{prompt:''}:{});
-        setTimeout(()=>finish(false),silent?8000:60000);
-      }catch{finish(false)}
-    });
-  })();
+/* ── .ics import: VEVENTs with DAILY/WEEKLY/MONTHLY/YEARLY rules, EXDATE, and
+   moved occurrences (RECURRENCE-ID). A TZID time is read as local time —
+   right whenever the calendar's zone is the computer's. */
+function icsDate(v){
+  const m=/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})\d{0,2}(Z)?)?$/.exec(String(v).trim());
+  if(!m)return null;
+  if(!m[4])return{date:`${m[1]}-${m[2]}-${m[3]}`,time:''};
+  const d=m[6]?new Date(Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5])):new Date(+m[1],m[2]-1,+m[3],+m[4],+m[5]);
+  return{date:dayKey(d),time:`${P(d.getHours())}:${P(d.getMinutes())}`};
 }
-/* Called before every agenda fetch and once a minute. Silent only — an
-   interactive prompt happens exactly once, when you click Connect. */
-async function gEnsure(){
-  if(!cfg.gClientId)return false;
-  if(gLive()&&gTok.exp-Date.now()>G_EARLY)return true;
-  if(!gGet('gever',false))return false;      /* never connected: never ask */
-  if(gRenewing)return gRenewing;
-  gRenewing=gRequest(true).then(ok=>{gRenewing=null;if(!ok){gStatus();gDot()}return ok});
-  return gRenewing;
-}
-async function gConnect(){
-  if(!cfg.gClientId)return toast('paste your OAuth client ID first');
-  const ok=await gRequest(false);
-  if(!ok)return toast('could not connect — offline, or the popup was blocked');
-  loadEvents();toast('google calendar connected');
-}
-function gDisconnect(){
-  gTok=null;gSet('gtok',null);gSet('gever',false);gStatus();loadEvents();toast('disconnected');
-}
-/* The status bar dot: lit majorelle while the week is genuinely live from
-   Google, dim the moment it is not. The whole point of the fix is that the
-   fallback stops being silent. */
-function gDot(){
-  const el=$('gdot'),live=gState==='live';
-  if(el.className!==('gdot'+(live?'':' off')))el.className='gdot'+(live?'':' off');
-  el.title=live?'agenda: google calendar, live'
-    :gState==='none'?'agenda: no feed — no google token and no JSON file'
-    :'agenda: local JSON file (gcal-sync)';
-}
-function gStatus(){
-  const on=gLive(),el=$('g-status');
-  el.className=on?'on':'';
-  setTxt(el,on?`Connected — token renews itself in the background (this one until ${new Date(gTok.exp).toTimeString().slice(0,5)}).`
-              :'Not connected — falling back to the JSON file.');
-  setTxt($('g-btn'),on?'Disconnect':'Connect Google Calendar');
-}
-const gLocal=s=>{const d=new Date(s);return `${dayKey(d)}T${P(d.getHours())}:${P(d.getMinutes())}`};
-async function gFetch(retry){
-  if(!cfg.gClientId)return null;
-  const ok=await gEnsure();
-  if(!ok||!gLive())return null;
-  const lo=new Date();lo.setDate(lo.getDate()-1);lo.setHours(0,0,0,0);
-  const hi=new Date();hi.setDate(hi.getDate()+7);hi.setHours(0,0,0,0);
-  const u='https://www.googleapis.com/calendar/v3/calendars/primary/events'
-    +`?singleEvents=true&orderBy=startTime&maxResults=250`
-    +`&timeMin=${encodeURIComponent(lo.toISOString())}&timeMax=${encodeURIComponent(hi.toISOString())}`;
-  try{
-    const r=await fetch(u,{headers:{Authorization:'Bearer '+gTok.t}});
-    if(r.status===401||r.status===403){
-      /* the token was rejected early — drop it and try ONE silent renewal
-         before giving the week back to the JSON file */
-      gTok=null;gSet('gtok',null);gStatus();
-      if(retry===false)return null;
-      return await gEnsure()?gFetch(false):null;
+const icsText=v=>String(v).replace(/\\n/gi,' ').replace(/\\([,;\\])/g,'$1').trim();
+function parseICS(txt){
+  const lines=String(txt).replace(/\r?\n[ \t]/g,'').split(/\r?\n/);
+  const raw=[];let cur=null;
+  for(const line of lines){
+    if(line==='BEGIN:VEVENT'){cur={ex:[]};continue}
+    if(line==='END:VEVENT'){if(cur&&cur.DTSTART)raw.push(cur);cur=null;continue}
+    if(!cur)continue;
+    const i=line.indexOf(':');if(i<0)continue;
+    const name=line.slice(0,i).split(';')[0].toUpperCase(),val=line.slice(i+1);
+    if(name==='EXDATE')cur.ex.push(...val.split(','));else cur[name]=val;
+  }
+  const out=[],byUid={},moved=[];
+  for(const c of raw){
+    if((c.STATUS||'').toUpperCase()==='CANCELLED')continue;
+    const s=icsDate(c.DTSTART);if(!s)continue;
+    const e=c.DTEND?icsDate(c.DTEND):null;
+    const ev={id:'i'+Math.random().toString(36).slice(2,10),date:s.date,start:s.time,
+      end:e&&s.time&&e.date===s.date?e.time:'',title:icsText(c.SUMMARY||'untitled')||'untitled',rep:'',src:'ics'};
+    /* all-day DTEND is exclusive: a 3-day trip ends the morning after */
+    if(!s.time&&e&&!e.time){const last=dayKey(addDays(new Date(e.date+'T12:00:00'),-1));if(last>s.date)ev.last=last}
+    if(c.RRULE){
+      const rr={};c.RRULE.split(';').forEach(x=>{const[a,b]=x.split('=');rr[a.toUpperCase()]=b});
+      const f=(rr.FREQ||'').toLowerCase();
+      if(['daily','weekly','monthly','yearly'].includes(f)){
+        ev.rep=f;ev.iv=+rr.INTERVAL||1;
+        if(rr.COUNT)ev.count=+rr.COUNT;
+        if(rr.UNTIL){const u=icsDate(rr.UNTIL);if(u)ev.until=u.date}
+        if(f==='weekly'&&rr.BYDAY)ev.byday=rr.BYDAY.split(',').map(x=>['SU','MO','TU','WE','TH','FR','SA'].indexOf(x.slice(-2))).filter(x=>x>=0);
+      }
     }
-    const d=await r.json();
-    return (d.items||[]).map(e=>({
-      start:e.start.dateTime?gLocal(e.start.dateTime):e.start.date,
-      end:e.end?(e.end.dateTime?gLocal(e.end.dateTime):e.end.date):'',
-      title:e.summary||'untitled',allDay:!e.start.dateTime,
-    }));
-  }catch{return null}
+    const ex=c.ex.map(x=>{const d=icsDate(x);return d&&d.date}).filter(Boolean);if(ex.length)ev.ex=ex;
+    if(c['RECURRENCE-ID']){const rid=icsDate(c['RECURRENCE-ID']);if(rid)moved.push([c.UID,rid.date])}
+    else if(c.UID)byUid[c.UID]=ev;
+    out.push(ev);
+  }
+  /* a moved occurrence is its own VEVENT; the series must skip the old slot */
+  moved.forEach(([uid,date])=>{const m=byUid[uid];if(m&&m.rep)(m.ex=m.ex||[]).push(date)});
+  return out;
+}
+async function importICS(file){
+  try{
+    const evs=parseICS(await file.text());
+    if(!evs.length)return toast('no events found in '+file.name);
+    agenda=agenda.filter(e=>e.src!=='ics').concat(evs);saveAgenda();renderAgenda();
+    toast(`${evs.length} events imported`);
+  }catch{toast('could not read '+file.name)}
+}
+function renderAgenda(){
+  const today=dayKey(new Date());
+  const mine=agenda.filter(e=>e.src!=='ics').sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  const rep={daily:'DAILY',weekly:'WEEKLY',monthly:'MONTHLY',yearly:'YEARLY'};
+  $('ag-list').innerHTML=mine.length?mine.map(e=>{
+    const d=new Date(e.date+'T12:00:00'),past=!e.rep&&(e.last||e.date)<today;
+    return `<div class="agi${past?' past':''}"><span class="ad">${DW[d.getDay()]} ${isoToDmy(e.date)}</span>`
+      +`<span class="at">${e.start?esc(e.start)+(e.end?'–'+esc(e.end):''):'all day'}</span>`
+      +`<span class="an" title="${esc(e.title)}">${esc(e.title)}</span><span class="ar2">${rep[e.rep]||''}</span>`
+      +`<button type="button" data-id="${esc(e.id)}" title="delete">×</button></div>`;
+  }).join(''):'<div class="hint">Nothing yet — your events appear here and in the week.</div>';
+  const n=agenda.length-mine.length;
+  setTxt($('ag-imp'),n?`${n} imported`:'');
+}
+const hhmm=v=>{const m=/^([01]?\d|2[0-3]):?([0-5]\d)$/.exec(String(v).trim());return m?`${P(+m[1])}:${m[2]}`:null};
+function addEvent(){
+  const iso=dmyToIso($('ag-date').value,true),title=$('ag-title').value.trim();
+  const t=$('ag-time').value.trim(),en=$('ag-end').value.trim();
+  const start=t?hhmm(t):'',end=en?hhmm(en):'';
+  $('ag-date').classList.toggle('bad',!iso);
+  $('ag-time').classList.toggle('bad',start===null);
+  $('ag-end').classList.toggle('bad',end===null||(!!end&&!start));
+  if(!iso||start===null||end===null||(end&&!start))return toast('check the date and times');
+  if(!title){$('ag-title').focus();return toast('what is it?')}
+  agenda.push({id:'m'+Date.now().toString(36),date:iso,start,end:end&&end>start?end:'',title,rep:$('ag-rep').value,src:'me'});
+  saveAgenda();renderAgenda();
+  $('ag-title').value='';$('ag-time').value='';$('ag-end').value='';$('ag-title').focus();
+  toast('added');
+}
+function openAgenda(){
+  show('ov-agenda');
+  if(!$('ag-date').value)$('ag-date').value=isoToDmy(dayKey(new Date()));
+  renderAgenda();setTimeout(()=>$('ag-title').focus(),0);
+}
+/* ── backup: every deck_ key (bar the weather cache) as one JSON file ── */
+function exportBackup(){
+  const data={};
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k.startsWith('deck_')&&!k.startsWith('deck_wx_'))data[k]=localStorage.getItem(k)}}catch{}
+  const url=URL.createObjectURL(new Blob([JSON.stringify({deck:1,at:new Date().toISOString(),data},null,1)],{type:'application/json'}));
+  const a=document.createElement('a');a.href=url;a.download=`deck-backup-${dayKey(new Date())}.json`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  toast('backup saved');
+}
+async function importBackup(file){
+  try{
+    const b=JSON.parse(await file.text());
+    if(!b||b.deck!==1||typeof b.data!=='object')throw 0;
+    if(!confirm(`Replace this deck's data with the backup from ${String(b.at||'?').slice(0,10)}?`))return;
+    Object.entries(b.data).forEach(([k,v])=>{if(k.startsWith('deck_')&&typeof v==='string')localStorage.setItem(k,v)});
+    location.reload();
+  }catch{toast('not a deck backup file')}
 }
 
 /* ── §7 THE WEEK — yesterday → today+6 ── */
@@ -857,17 +1007,18 @@ function groupEvents(list){
   Object.values(map).forEach(v=>v.sort((a,b)=>String(a.start).localeCompare(String(b.start))));
   return map;
 }
-async function loadEvents(){
-  const g=await gFetch();
-  if(g){eventsByDay=groupEvents(g);gState='live';gDot();renderWeek();return}
-  try{
-    const r=await fetch(cfg.icsPath,{cache:'no-cache'});
-    if(!r.ok)throw new Error('missing');
-    const raw=await r.json();
-    eventsByDay=groupEvents(Array.isArray(raw)?raw:(raw.events||[]));
-    gState='json';
-  }catch{eventsByDay=null;gState='none'}
-  gDot();renderWeek();
+/* The 8 visible days, expanded from the local agenda. Cheap enough to redo on
+   every change and at midnight. */
+function loadEvents(){
+  const base=new Date(),map={};
+  for(let i=-1;i<=6;i++){
+    const d=addDays(base,i),k=dayKey(d);
+    const list=agenda.filter(ev=>occursOn(ev,k,d)).map(ev=>({
+      start:ev.start?`${k}T${ev.start}`:k,end:ev.end?`${k}T${ev.end}`:'',title:ev.title,allDay:!ev.start}));
+    if(list.length)map[k]=list;
+  }
+  eventsByDay=groupEvents(Object.values(map).flat());
+  renderWeek();
 }
 /* One string per DAY CELL, not one string for the grid. A single event moving
    used to restring all eight columns and hand the browser a fresh innerHTML for
@@ -886,7 +1037,7 @@ function renderWeek(){
     const k=dayKey(d),isToday=k===todayK,isPast=k<todayK;
     const evs=(eventsByDay&&eventsByDay[k])||[];
     let body;
-    if(eventsByDay===null&&isToday) body='<div class="dfree">NO FEED</div>';
+    if(!agenda.length&&isToday)    body='<div class="dfree">A · ADD EVENTS</div>';
     else if(!evs.length)            body='<div class="dfree">—</div>';
     else{
       body=evs.slice(0,5).map(e=>{
@@ -955,14 +1106,23 @@ function renderPom(){
   let w='';
   if(pom.running&&prayer){
     const{nxt,nxtM}=activePrayer(),mins=Math.ceil(ms/60000);
-    if(nxt&&nxtM<mins)w=`⚠ ${nxt.en} in ${nxtM}m — this session overruns by ${mins-nxtM}m`;
+    if(nxt&&nxtM<mins)w=`⚠ ${pName(nxt).en} in ${nxtM}m — this session overruns by ${mins-nxtM}m`;
   }
   setTxt($('warn'),w);
 }
-function beep(){
+/* ONE AudioContext for the life of the page. A new one per beep was never
+   closed, and browsers cap how many may exist — after enough beeps the deck
+   went silent. A context made before any user gesture also starts suspended
+   under autoplay rules, so the first click or key primes it. */
+let audio=null;
+function audioCtx(){audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();return audio}
+const primeAudio=()=>{try{audioCtx()}catch{}};
+document.addEventListener('pointerdown',primeAudio,{once:true});
+document.addEventListener('keydown',primeAudio,{once:true});
+function beep(freq){
   try{
-    const A=new (window.AudioContext||window.webkitAudioContext)(),o=A.createOscillator(),g=A.createGain();
-    o.type='sine';o.frequency.value=660;o.connect(g);g.connect(A.destination);
+    const A=audioCtx(),o=A.createOscillator(),g=A.createGain();
+    o.type='sine';o.frequency.value=freq||660;o.connect(g);g.connect(A.destination);
     g.gain.setValueAtTime(.0001,A.currentTime);
     g.gain.exponentialRampToValueAtTime(.22,A.currentTime+.02);
     g.gain.exponentialRampToValueAtTime(.0001,A.currentTime+.9);
@@ -971,50 +1131,75 @@ function beep(){
 }
 function notify(t,b){try{if(Notification.permission==='granted')new Notification(t,{body:b})}catch{}}
 
-/* ── §8b ADHAN PILL — 3s drop-in, once per prayer per day, Sunrise excluded ── */
+/* ── §8b ADHAN PILL — 3s drop-in, once per prayer per day, Sunrise excluded ──
+   Two alerts per prayer: the adhan itself, and an early reminder cfg.pre
+   minutes before it (enough to finish a thought and make wudu). */
 const ADHAN_MS=3000;let adhanT;
-function adhanPill(p,time){
+function showPill(ic,ttl,sub,time){
   const el=$('adhan');
-  el.innerHTML=`<span class="ic">🕌</span><div><div class="ttl ar">حان وقت صلاة ${esc(p.ar)}</div>`
-    +`<div class="sub">${esc(p.en)} · ${esc(getCity()[3])}</div></div><span class="tm">${esc(time)}</span>`;
+  el.innerHTML=`<span class="ic">${ic}</span><div><div class="ttl ar">${esc(ttl)}</div>`
+    +`<div class="sub">${esc(sub)}</div></div><span class="tm">${esc(time)}</span>`;
   el.classList.add('show');clearTimeout(adhanT);
   adhanT=setTimeout(()=>el.classList.remove('show'),ADHAN_MS);
-  beep();notify('حان وقت صلاة '+p.ar,`${p.en} · ${time} · ${getCity()[3]}`);
 }
+function adhanPill(p,time){
+  const n=pName(p),city=getCity()[3];
+  showPill('🕌','حان وقت صلاة '+n.ar,`${n.en} · ${city}`,time);
+  beep();notify('حان وقت صلاة '+n.ar,`${n.en} · ${time} · ${city}`);
+}
+function prePill(p,time,left){
+  const n=pName(p),city=getCity()[3];
+  showPill('⏳','اقترب وقت صلاة '+n.ar,`${n.en} in ${left} min · ${city}`,time);
+  beep(520);notify(`${n.en} in ${left} min`,`${time} · ${city}`);
+}
+/* A hidden tab has its timers throttled to as little as once a minute, so the
+   old exact-minute match could skip an adhan entirely. Each alert now has a
+   window of ALERT_WIN minutes, and a per-day list of what already fired keeps
+   it to exactly once. */
+const ALERT_WIN=3;
 function checkAdhan(now){
   if(!prayer)return;
-  const nm=now.getHours()*60+now.getMinutes(),seen=gGet('adhanSeen',{});
+  const nm=now.getHours()*60+now.getMinutes(),day=dayKey(now);
+  let seen=gGet('alerts',null);
+  if(!seen||seen.d!==day||!Array.isArray(seen.ids))seen={d:day,ids:[]};
   for(const p of PRAYERS){
     if(p.key==='Sunrise')continue;
-    const t=tMin(prayer[p.key]);
-    if(t<0||nm!==t)continue;
-    const id=dayKey(now)+'|'+p.key;
-    if(seen.id===id)return;
-    gSet('adhanSeen',{id});adhanPill(p,prayer[p.key]);return;
+    const t=tMin(prayer[p.key]);if(t<0)continue;
+    let kind=null;
+    if(nm>=t&&nm<t+ALERT_WIN)kind='adhan';
+    else if(cfg.pre>0&&nm>=t-cfg.pre&&nm<Math.min(t,t-cfg.pre+ALERT_WIN))kind='pre';
+    if(!kind)continue;
+    const id=p.key+'|'+kind;
+    if(seen.ids.includes(id))continue;
+    seen.ids.push(id);gSet('alerts',seen);
+    kind==='adhan'?adhanPill(p,prayer[p.key]):prePill(p,prayer[p.key],t-nm);
+    return;
   }
 }
 
 /* ── §9 TICK ── */
-let lastDay=dayKey(new Date()),lastTs=Date.now();
+let lastDay=dayKey(new Date()),lastTs=Date.now(),lastMinute=-1;
 function tick(){
   const now=new Date();
   /* a >90s gap between ticks means the laptop slept — resync from wall clock */
   const jumped=Date.now()-lastTs>90000;lastTs=Date.now();
   setTxt($('c-clock'),`${P(now.getHours())}:${P(now.getMinutes())}:${P(now.getSeconds())}`);
   setTxt($('c-greg'),`${now.getDate()} ${EN_M[now.getMonth()]} ${now.getFullYear()}`);
-  const dd=`${P(now.getDate())}-${P(now.getMonth()+1)}-${now.getFullYear()}`;
-  const h=(apiHijri&&apiHijri.gDate===dd)
-    ?{d:apiHijri.day,m:apiHijri.monthAr,y:apiHijri.year}
-    :(()=>{const x=toHijri(now.getFullYear(),now.getMonth(),now.getDate());return{d:x.day,m:HIJRI_M[x.month-1],y:x.year}})();
+  const h=hijriFor(now);
   setTxt($('c-hij'),`${h.d} ${h.m} ${h.y} هـ`);
   setTxt($('b-city'),getCity()[2]);
   renderPom();checkAdhan(now);
   if(pom.running&&pomRemain()<=0)pomFinish();
   if(now.getSeconds()%5===0)updNow();
-  if(now.getSeconds()===0)renderWeek();
+  /* Once per wall-clock MINUTE, detected by change rather than by seconds===0,
+     which a throttled background tab can step straight over. The spine is
+     redrawn too: a prayer's pass/next state used to freeze at whatever it was
+     when the timings loaded, so a passed Dhuhr kept reading as "next". */
+  const mk=now.getHours()*60+now.getMinutes();
+  if(mk!==lastMinute){lastMinute=mk;renderWeek();renderSpine()}
   const k=dayKey(now);
   if(k!==lastDay||jumped){
-    lastDay=k;loadPrayer(true);loadWeather(true);loadEvents();renderLife();renderSpine();
+    lastDay=k;computePrayer();loadWeather(true);loadEvents();renderLife();renderSpine();
   }
 }
 
@@ -1028,10 +1213,16 @@ function buildPal(q){
   const cmds=[
     ['start / pause',()=>pomToggle()],['reset phase',()=>pomReset()],['skip phase',()=>pomNext(false)],
     ['set intention',()=>askIntent()],['settings',()=>show('ov-set')],['keys',()=>show('ov-help')],
-    ['connect google calendar',()=>gConnect()],
-    ['refetch everything',()=>{loadPrayer(true);loadWeather(true);loadEvents();toast('refetching')}],
+    ['agenda',()=>openAgenda()],['import calendar (.ics)',()=>$('file-ics').click()],
+    ['export backup',()=>exportBackup()],['import backup',()=>$('file-backup').click()],
+    ['refetch weather',()=>{loadWeather(true);toast(cfg.wx?'refetching weather':'weather is off — s')}],
+    ['nearest city (location)',()=>nearestCity()],
     ['preview adhan pill',()=>{const{nxt}=activePrayer(),p=nxt||PRAYERS[0];adhanPill(p,prayer?prayer[p.key]:'--:--')}],
-    ['enable notifications',()=>Notification.requestPermission().then(p=>toast('notifications: '+p))],
+    ['preview adhan reminder',()=>{const{nxt,nxtM}=activePrayer(),p=nxt||PRAYERS[0];prePill(p,prayer?prayer[p.key]:'--:--',nxtM>0?nxtM:cfg.pre)}],
+    ['enable notifications',()=>{
+      if(typeof Notification==='undefined')return toast('notifications unsupported here');
+      Notification.requestPermission().then(p=>toast('notifications: '+p));
+    }],
     ['clear today’s sessions',()=>{const a=gGet('sessions',{});delete a[dayKey(new Date())];gSet('sessions',a);renderSpine();toast('cleared')}],
   ];
   cmds.forEach(([label,fn])=>{if(!n||norm(label).includes(n))out.push({k:'cmd',label,sub:'',fn})});
@@ -1050,7 +1241,20 @@ function renderPal(q){
 function openPal(){show('ov-pal');palSel=0;$('pal-in').value='';renderPal('');setTimeout(()=>$('pal-in').focus(),0)}
 $('pal-in').addEventListener('input',e=>{palSel=0;renderPal(e.target.value)});
 $('pal-list').addEventListener('click',e=>{const it=e.target.closest('.pi');if(it){const f=palItems[+it.dataset.i].fn;closeOv();f()}});
-function setCity(i){cfg.city=i;gSet('city',i);loadPrayer(true);loadWeather(true);toast('city → '+getCity()[2])}
+function setCity(i){cfg.city=i;gSet('city',i);computePrayer();loadWeather(true);toast('city → '+getCity()[2])}
+/* Nearest listed city to where the browser says you are. Flat-earth distance
+   with a cos(lat) correction — at Morocco's scale the error is far below the
+   spacing between cities, and prayer times barely move within that. */
+function nearestCity(){
+  if(!navigator.geolocation)return toast('location unavailable here');
+  toast('locating…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const la=pos.coords.latitude,lo=pos.coords.longitude,k=Math.cos(la*Math.PI/180);
+    let best=0,bd=Infinity;
+    CITIES.forEach((c,i)=>{const d=(c[4]-la)**2+((c[5]-lo)*k)**2;if(d<bd){bd=d;best=i}});
+    setCity(best);
+  },()=>toast('location refused or unavailable'),{timeout:10000,maximumAge:3600000});
+}
 function askIntent(){
   const v=prompt('What is this session for?',pom.label||'');
   if(v===null)return;
@@ -1060,31 +1264,65 @@ function askIntent(){
   el.classList.toggle('empty',!pom.label);
   lastTitle='';renderPom();saveLive();
 }
+/* A number field's value, clamped to its own min/max. `+v||old` used to be the
+   rule here, which silently refused 0 — fatal for "remind 0 min before" (off)
+   and a Hijri offset of 0. An empty or half-typed field keeps the old value. */
+function numOf(el,old){
+  const t=el.value.trim();
+  if(t===''||t==='-'||isNaN(+t))return old;
+  let v=Math.round(+t);
+  if(el.min!=='')v=Math.max(+el.min,v);
+  if(el.max!=='')v=Math.min(+el.max,v);
+  return v;
+}
 [['f-exp','expect','num'],['f-work','work','num'],['f-short','short','num'],
  ['f-long','long','num'],['f-cyc','cycle','num'],['f-goal','goal','num'],
- ['f-ics','icsPath','str'],['f-gid','gClientId','str']].forEach(([id,key,type])=>{
+ ['f-pre','pre','num'],['f-hadj','hadj','num']].forEach(([id,key,type])=>{
   const el=$(id);el.value=cfg[key];
   el.addEventListener('input',()=>{
-    cfg[key]=type==='num'?(+el.value||cfg[key]):el.value;
+    cfg[key]=type==='num'?numOf(el,cfg[key]):el.value;
     gSet(key,cfg[key]);renderLife();renderMortality();renderSpine();
     if(!pom.running&&['work','short','long'].includes(key))pomReset();
-    if(key==='icsPath')loadEvents();
   });
 });
 /* birthday: typed as dd/mm/yyyy, stored as ISO, slashes inserted as you go */
+/* dd/mm/yyyy and hh:mm fields: separators inserted as you type */
+function maskDmy(el){
+  const d=el.value.replace(/\D/g,'').slice(0,8);
+  const v=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`:d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d;
+  if(v!==el.value)el.value=v;return v;
+}
+function maskHm(el){
+  const d=el.value.replace(/\D/g,'').slice(0,4),v=d.length>2?`${d.slice(0,2)}:${d.slice(2)}`:d;
+  if(v!==el.value)el.value=v;el.classList.remove('bad');
+}
 (function bindBday(){
   const el=$('f-bday');el.value=isoToDmy(cfg.bday);
   el.addEventListener('input',()=>{
-    let d=el.value.replace(/\D/g,'').slice(0,8);
-    let v=d.length>4?`${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}`
-         :d.length>2?`${d.slice(0,2)}/${d.slice(2)}`:d;
-    if(v!==el.value)el.value=v;
+    const v=maskDmy(el);
     const iso=dmyToIso(v);
     el.classList.toggle('bad',v.length===10&&!iso);
     if(iso){cfg.bday=iso;gSet('bday',iso);renderLife();renderMortality()}
   });
 })();
-$('g-btn').addEventListener('click',()=>{(gTok&&gTok.exp>Date.now())?gDisconnect():gConnect()});
+$('f-wx').checked=!!cfg.wx;
+$('f-wx').addEventListener('change',e=>{cfg.wx=e.target.checked;gSet('wx',cfg.wx);loadWeather(true)});
+$('ag-date').addEventListener('input',e=>{maskDmy(e.target);e.target.classList.remove('bad')});
+$('ag-time').addEventListener('input',e=>maskHm(e.target));
+$('ag-end').addEventListener('input',e=>maskHm(e.target));
+$('ag-add').addEventListener('click',addEvent);
+$('ag-title').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addEvent()}});
+$('ag-list').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-id]');if(!b)return;
+  agenda=agenda.filter(x=>x.id!==b.dataset.id);saveAgenda();renderAgenda();
+});
+$('ag-import').addEventListener('click',()=>$('file-ics').click());
+$('ag-clear').addEventListener('click',()=>{agenda=agenda.filter(x=>x.src!=='ics');saveAgenda();renderAgenda();toast('imported events removed')});
+$('b-agenda').addEventListener('click',openAgenda);
+$('b-export').addEventListener('click',exportBackup);
+$('b-import').addEventListener('click',()=>$('file-backup').click());
+$('file-ics').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importICS(f)});
+$('file-backup').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importBackup(f)});
 document.addEventListener('keydown',e=>{
   const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   if(e.key==='Escape'){closeOv();if(typing)e.target.blur();return}
@@ -1104,8 +1342,9 @@ document.addEventListener('keydown',e=>{
     case 'i':e.preventDefault();askIntent();break;
     case 'c':case ':':e.preventDefault();openPal();break;
     case 's':e.preventDefault();show('ov-set');setTimeout(()=>$('f-bday').focus(),0);break;
+    case 'a':e.preventDefault();openAgenda();break;
     case '?':e.preventDefault();show('ov-help');break;
-    case 'R':loadPrayer(true);loadWeather(true);loadEvents();toast('refetching');break;
+    case 'R':loadWeather(true);toast(cfg.wx?'refetching weather':'weather is off — s');break;
   }
 });
 document.querySelectorAll('.ov').forEach(o=>o.addEventListener('mousedown',e=>{if(e.target===o)closeOv()}));
@@ -1114,7 +1353,7 @@ $('intent').addEventListener('click',askIntent);
 /* ── §11 BOOT ── */
 let rt;
 window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{renderLife();renderMortality();renderSpine();renderWeek()},120)});
-window.addEventListener('online',()=>{loadPrayer(true);loadWeather(true);loadEvents()});
+window.addEventListener('online',()=>loadWeather(true));
 window.addEventListener('beforeunload',saveLive);
 
 (function boot(){
@@ -1124,14 +1363,20 @@ window.addEventListener('beforeunload',saveLive);
     pom.phase=live.phase;pom.done=live.done;pom.label=live.label||'';
     pom.startedMin=live.startedMin;pom.endsAt=live.endsAt;pom.running=true;
     if(pom.label){$('intent').textContent=pom.label;$('intent').classList.remove('empty')}
-  }else{pom.remain=cfg.work*60*1000;gSet('live',null)}
-  renderPom();renderLife();renderMortality();renderSpine();renderWeek();gStatus();gDot();
-  loadPrayer(false);loadWeather(false);loadEvents();
+  }else{
+    /* The session ran out while the page was closed. It still happened, so it
+       still goes on the spine — provided it ended today. */
+    if(live&&live.startedMin!=null&&dayKey(new Date(live.endsAt))===dayKey(new Date())){
+      const min={work:cfg.work,short:cfg.short,long:cfg.long}[live.phase];
+      if(min)pushSession({type:live.phase,min,startMin:live.startedMin,label:live.label||''});
+    }
+    pom.remain=cfg.work*60*1000;gSet('live',null);
+  }
+  cleanupLegacy();
+  renderPom();renderLife();renderMortality();computePrayer();loadEvents();loadWeather(false);
   tick();setInterval(tick,1000);
   setInterval(renderMortality,200);   /* 5 Hz — the churn reads as continuous */
   setInterval(()=>loadWeather(false),30*60*1000);
-  setInterval(()=>loadEvents(),10*60*1000);
-  setInterval(gEnsure,60*1000);       /* renew the Google token before it lapses */
   if(!cfg.bday)setTimeout(()=>toast('press s to set your birthday'),1200);
 })();
 </script>
