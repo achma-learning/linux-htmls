@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Prayer Spine
+GenericName=Prayer times
+Comment=Prayer times, weather and the day spine in the system tray
+Exec=prayer-tray --show
+Icon=achma-prayer-tray
+Terminal=false
+Categories=Utility;
+Keywords=prayer;salat;adhan;Morocco;Maroc;weather;صلاة;
+StartupNotify=false
+Actions=settings;
+
+[Desktop Action settings]
+Name=Settings (change city)
+Exec=prayer-tray --settings

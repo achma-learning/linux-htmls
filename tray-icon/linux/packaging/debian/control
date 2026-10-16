@@ -1,0 +1,23 @@
+Package: achma-tray
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: all
+Installed-Size: @SIZE@
+Maintainer: achma-learning <achma-learning@users.noreply.github.com>
+Depends: python3 (>= 3.8), python3-gi (>= 3.30), python3-gi-cairo, python3-cairo, gir1.2-gtk-3.0, gir1.2-pango-1.0
+Suggests: gnome-shell-extension-appindicator, gir1.2-gtklayershell-0.1
+Homepage: https://github.com/achma-learning/html-files
+Description: prayer day spine and AI chatbot launcher in the system tray
+ Two tray apps for Moroccan users, built from the pages in "html file/":
+ .
+  * Prayer Spine (prayer-tray): city, weather, the day drawn to scale and the
+    countdown to the next prayer. Times are computed locally with the
+    Moroccan Ministry method, for 57 Moroccan cities or any custom location.
+    Notifications before and at each adhan.
+  * AI Hub (ai-hub-tray): one click or Ctrl+Alt+A to open ChatGPT, Claude,
+    Gemini and a dozen more, each in its own window.
+ .
+ Uses the StatusNotifierItem tray protocol: works in KDE Plasma and XFCE as
+ they are, and in GNOME with the AppIndicator extension (preinstalled on
+ Ubuntu).

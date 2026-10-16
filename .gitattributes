@@ -2,3 +2,5 @@
 * text=auto
 *.exe binary
 *.ico binary
+*.deb binary
+*.rpm binary

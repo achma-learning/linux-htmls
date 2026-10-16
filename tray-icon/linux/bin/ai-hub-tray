@@ -1,0 +1,15 @@
+#!/usr/bin/python3
+# ai-hub-tray — launcher. Finds the achma_tray package next to this script (a checkout)
+# or in /usr/share/achma-tray (the .deb/.rpm), then runs it.
+import os
+import sys
+
+here = os.path.dirname(os.path.realpath(__file__))
+for base in (os.path.join(here, ".."), "/usr/share/achma-tray", "/usr/local/share/achma-tray"):
+    if os.path.isfile(os.path.join(base, "achma_tray", "__init__.py")):
+        sys.path.insert(0, os.path.abspath(base))
+        break
+
+from achma_tray.aihub import main  # noqa: E402
+
+sys.exit(main())

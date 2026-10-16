@@ -44,9 +44,10 @@
 
 # Other projects in this repo
 
-- `tray-icon/` — Windows tray apps (AI Hub launcher, prayer day spine) for Moroccan
-  Windows users; a Linux version (.deb/.rpm) is planned for later, not now. It has its
-  own context in `tray-icon/CLAUDE.md`; the i3 constraints above do not apply there.
+- `tray-icon/` — tray apps (AI Hub launcher, prayer day spine) for Moroccan users:
+  Windows `.exe` files, and a Linux port in `tray-icon/linux/` (.deb + .rpm; XFCE, KDE,
+  GNOME). It has its own context in `tray-icon/CLAUDE.md`; the i3 constraints above do
+  not apply there.
 - `html file/` — the standalone pages (`ai-hub.html`, `start-dock.html`) the tray apps
   are ported from and embed. Prayer math and the city list must stay in sync with
-  `tray-icon/src/prayer-tray.cpp`.
+  `tray-icon/src/prayer-tray.cpp` and `tray-icon/linux/achma_tray/prayer_core.py`.
