@@ -1,0 +1,31 @@
+#include <winver.h>
+#include "resource.h"
+
+IDI_APP   ICON    "icons/ai-hub-tray.ico"
+IDR_PAGE  RCDATA  "../../html file/ai-hub.html"
+1         24      "app.manifest"   /* RT_MANIFEST, CREATEPROCESS_MANIFEST_RESOURCE_ID */
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName",      "achma-learning"
+      VALUE "FileDescription",  "AI Hub - quick launcher for AI chatbots in the tray"
+      VALUE "FileVersion",      "1.0.0"
+      VALUE "InternalName",     "ai-hub-tray"
+      VALUE "OriginalFilename", "ai-hub-tray.exe"
+      VALUE "ProductName",      "Achma tray icons"
+      VALUE "ProductVersion",   "1.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
