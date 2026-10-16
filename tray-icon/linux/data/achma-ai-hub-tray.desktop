@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=AI Hub
+GenericName=AI chatbot launcher
+Comment=Quick launcher for AI chatbots in the system tray
+Exec=ai-hub-tray --launcher
+Icon=achma-ai-hub-tray
+Terminal=false
+Categories=Utility;Network;
+Keywords=AI;chatbot;ChatGPT;Claude;Gemini;launcher;
+StartupNotify=false
+Actions=open-default;
+
+[Desktop Action open-default]
+Name=Open default assistant
+Exec=ai-hub-tray --open-default

@@ -1,13 +1,23 @@
 # tray-icon
 
-Two small Windows programs that each put one icon in the notification area
-(the system tray). They are native Win32 builds of the two pages in
-`html file/`.
+Two tray apps, built from the two pages in `html file/`. Each one puts its own
+icon in the notification area (the system tray). They exist for **Windows**
+(this folder) and **Linux** ([`linux/`](linux/)).
 
-| File | What it does |
+| App | What it does |
 |---|---|
-| `ai-hub-tray.exe` | Quick launcher for AI chatbots (`ai-hub.html` as a tray menu) |
-| `prayer-tray.exe` | City, weather, the **day spine** and the next prayer (the spine pane of `start-dock.html`) |
+| **AI Hub** | Quick launcher for AI chatbots (`ai-hub.html` as a tray app) |
+| **Prayer Spine** | City, weather, the **day spine** and the next prayer (the spine pane of `start-dock.html`) |
+
+| Platform | Get it |
+|---|---|
+| Windows 7 SP1 · 8 · 10 · 11 | `ai-hub-tray.exe`, `prayer-tray.exe` (this folder): single files, nothing to install |
+| Debian · Ubuntu · Mint | [`linux/dist/achma-tray_1.0.0-1_all.deb`](linux/dist/), installed with `sudo apt install ./achma-tray_1.0.0-1_all.deb` |
+| Fedora · RHEL 9+ | [`linux/dist/achma-tray-1.0.0-1.noarch.rpm`](linux/dist/), installed with `sudo dnf install ./achma-tray-1.0.0-1.noarch.rpm` |
+
+On Linux it works in KDE Plasma, XFCE and GNOME. Details are in [`linux/README.md`](linux/README.md).
+
+The rest of this page is about the Windows build.
 
 Each `.exe` is a single file of about 100–200 KB. Nothing to install: no .NET,
 no Visual C++ runtime, no admin rights. Copy it anywhere and double-click it.

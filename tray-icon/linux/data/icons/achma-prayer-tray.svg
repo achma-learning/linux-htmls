@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Prayer Spine: the day as a rail, what is lived of it, and now -->
+  <defs>
+    <linearGradient id="lived" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4FB09A"/><stop offset="1" stop-color="#E8A33D"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#1D2430" stroke="#333D4D" stroke-width="4"/>
+  <rect x="20.8" y="10.4" width="6.4" height="43.2" fill="#333D4D"/>
+  <rect x="20.8" y="10.4" width="6.4" height="26.8" fill="url(#lived)"/>
+  <rect x="31.2" y="11.8" width="18" height="4" fill="#818C9E"/>
+  <rect x="31.2" y="17.4" width="18" height="4" fill="#818C9E"/>
+  <rect x="31.2" y="30" width="18" height="4" fill="#818C9E"/>
+  <rect x="31.2" y="36.4" width="28" height="8" fill="#C96A4E"/>
+  <rect x="31.2" y="47" width="18" height="4" fill="#818C9E"/>
+  <circle cx="24" cy="37.2" r="8.8" fill="#E8A33D"/>
+</svg>
