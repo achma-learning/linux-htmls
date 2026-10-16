@@ -41,3 +41,12 @@
   and `date` render local (+01 here). A 1-hour "gap" between them is that, not a real gap.
 - Work only inside ~/i3-setup and ~/.config/i3. Never read or write elsewhere in $HOME
   without asking first.
+
+# Other projects in this repo
+
+- `tray-icon/` — Windows tray apps (AI Hub launcher, prayer day spine) for Moroccan
+  Windows users; a Linux version (.deb/.rpm) is planned for later, not now. It has its
+  own context in `tray-icon/CLAUDE.md`; the i3 constraints above do not apply there.
+- `html file/` — the standalone pages (`ai-hub.html`, `start-dock.html`) the tray apps
+  are ported from and embed. Prayer math and the city list must stay in sync with
+  `tray-icon/src/prayer-tray.cpp`.
